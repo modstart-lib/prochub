@@ -2,7 +2,7 @@
 import { Button, Card, Divider, Modal, RadioButton, RadioGroup, Select, Switch } from 'ant-design-vue';
 import { Globe, Info, Languages, Moon, Power, RefreshCw, Sun } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
-import { GetConfig, UpdateConfig } from '../../../wailsjs/go/main/App';
+import { GetAutoStartEnabled, GetConfig, SetAutoStartEnabled, UpdateConfig } from '../../../wailsjs/go/main/App';
 import { trackVisit } from '../../services/analytics';
 import { checkVersionAndPrompt, getAppVersion } from '../../services/version';
 import { useAppStore } from '../../stores/app';
@@ -45,26 +45,27 @@ onMounted(async () => {
   appVersion.value = await getAppVersion()
 })
 
-// Load autoStart config when modal opens
+// Load autoStart status when modal opens
 watch(() => props.visible, async (visible) => {
   if (visible) {
     try {
-      const cfg = await GetConfig()
-      autoStart.value = cfg.autoStart
+      // Get actual system auto-start status instead of config value
+      autoStart.value = await GetAutoStartEnabled()
     } catch (e) {
-      console.error('Failed to load config:', e)
+      console.error('Failed to load auto-start status:', e)
     }
   }
 }, { immediate: true })
 
 const toggleAutoStart = async (checked: boolean | string | number) => {
   try {
-    const cfg = await GetConfig()
-    cfg.autoStart = !!checked
-    await UpdateConfig(cfg)
+    // Call backend to enable/disable system-level auto-start
+    await SetAutoStartEnabled(!!checked)
     autoStart.value = !!checked
   } catch (e) {
-    console.error('Failed to update autoStart:', e)
+    console.error('Failed to update auto-start:', e)
+    // Revert the switch on error
+    autoStart.value = !checked
   }
 }
 

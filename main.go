@@ -108,7 +108,7 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		BackgroundColour:         &options.RGBA{R: 244, G: 239, B: 232, A: 1},
+		BackgroundColour:         &options.RGBA{R: 248, G: 250, B: 252, A: 1},
 		EnableDefaultContextMenu: false,
 		Menu:                     createApplicationMenu(),
 		CSSDragValue:             "drag",

@@ -48,7 +48,7 @@ echo "   源文件: $SVG_SOURCE"
 echo "📦 生成 appicon.png (1024x1024)..."
 # 生成 72% 大小的图标并居中（macOS 标准安全区域约为 80%，稍微更小一点确保视觉平衡）
 # 注意：macOS Big Sur+ 的图标规范通常主体在 824px 左右，这里使用约 740px 以确保四周有明显留白
-magick -background none -density 300 "$SVG_SOURCE" -resize 737x737 -gravity center -extent 1024x1024 "$APPICON_PNG"
+magick -background none -density 300 "$SVG_SOURCE" -resize 824x824 -gravity center -extent 1024x1024 "$APPICON_PNG"
 
 # 生成 macOS iconset
 echo "🍎 生成 macOS iconset..."

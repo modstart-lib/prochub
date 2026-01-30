@@ -16,7 +16,9 @@ const launchAgentTemplate = `<?xml version="1.0" encoding="UTF-8"?>
     <key>Label</key>
     <string>{{.Label}}</string>
     <key>ProgramArguments</key>
-    <array>
+    <array>{{if .IsAppBundle}}
+        <string>/usr/bin/open</string>
+        <string>-a</string>{{end}}
         <string>{{.AppPath}}</string>
     </array>
     <key>RunAtLoad</key>
@@ -32,10 +34,11 @@ const launchAgentTemplate = `<?xml version="1.0" encoding="UTF-8"?>
 `
 
 type launchAgentConfig struct {
-	Label   string
-	AppName string
-	AppPath string
-	LogDir  string
+	Label       string
+	AppName     string
+	AppPath     string
+	LogDir      string
+	IsAppBundle bool
 }
 
 // getLaunchAgentPath returns the path to the LaunchAgent plist file
@@ -88,12 +91,26 @@ func enableAutoStart(appName, displayName, appPath string) error {
 		return err
 	}
 
+	// Check if we're running from a .app bundle
+	// If the path contains .app/Contents/MacOS/, extract the .app path
+	finalAppPath := appPath
+	isAppBundle := false
+	if strings.Contains(appPath, ".app/Contents/MacOS/") {
+		// Extract the .app bundle path
+		parts := strings.Split(appPath, ".app/Contents/MacOS/")
+		if len(parts) > 0 {
+			finalAppPath = parts[0] + ".app"
+			isAppBundle = true
+		}
+	}
+
 	// Generate plist content
 	config := launchAgentConfig{
-		Label:   "com." + appName,
-		AppName: appName,
-		AppPath: appPath,
-		LogDir:  logDir,
+		Label:       "com." + appName,
+		AppName:     appName,
+		AppPath:     finalAppPath,
+		LogDir:      logDir,
+		IsAppBundle: isAppBundle,
 	}
 
 	tmpl, err := template.New("launchAgent").Parse(launchAgentTemplate)
