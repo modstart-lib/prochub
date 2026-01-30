@@ -76,6 +76,8 @@ jobs:
         run: |
           cd build/bin
           tar -czf ../../${{ matrix.asset_name }} ProcHub
+
+      - name: Upload Linux build artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
@@ -279,6 +281,8 @@ jobs:
         run: |
           cd build/bin
           tar -czf ../../${{ matrix.artifact_name }}.tar.gz ProcHub.app
+
+      - name: Upload tar.gz artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}-tar
