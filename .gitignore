@@ -1,0 +1,35 @@
+# Build outputs
+build/bin/
+prochub
+build/prochub-test
+
+# Dependencies
+node_modules/
+
+# Frontend build output
+frontend/dist/
+
+# Wails generated bindings (auto-generated on build)
+frontend/wailsjs/
+
+# Package manager temp files
+frontend/package.json.md5
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out

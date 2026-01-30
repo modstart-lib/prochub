@@ -1,0 +1,494 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  GO_VERSION: '1.24'
+  NODE_VERSION: '20'
+  APP_NAME: 'ProcHub'
+
+jobs:
+  # ==================== Linux Build ====================
+  build-linux:
+    name: Build Linux ${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goarch: amd64
+            artifact_name: ProcHub-linux-amd64
+            asset_name: ProcHub-linux-amd64.tar.gz
+          - goarch: arm64
+            artifact_name: ProcHub-linux-arm64
+            asset_name: ProcHub-linux-arm64.tar.gz
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm install
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev
+
+      - name: Install cross-compilation tools for arm64
+        if: matrix.goarch == 'arm64'
+        run: |
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+      - name: Build Wails app
+        env:
+          GOOS: linux
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 1
+          CC: ${{ matrix.goarch == 'arm64' && 'aarch64-linux-gnu-gcc' || 'gcc' }}
+          CXX: ${{ matrix.goarch == 'arm64' && 'aarch64-linux-gnu-g++' || 'g++' }}
+        run: |
+          wails build -platform linux/${{ matrix.goarch }} -trimpath -ldflags "-s -w"
+
+      - name: Package Linux build
+        run: |
+          cd build/bin
+          tar -czf ../../${{ matrix.asset_name }} ProcHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.asset_name }}
+          retention-days: 30
+
+  # ==================== Windows Build ====================
+  build-windows:
+    name: Build Windows amd64
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm install
+
+      - name: Build Wails app
+        run: |
+          wails build -platform windows/amd64 -trimpath -ldflags "-s -w" -nsis
+
+      - name: Package Windows build
+        run: |
+          cd build/bin
+          7z a ../../ProcHub-windows-amd64.zip ProcHub.exe
+          cd ../..
+
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ProcHub-windows-amd64
+          path: ProcHub-windows-amd64.zip
+          retention-days: 30
+
+      - name: Upload NSIS Installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ProcHub-windows-amd64-installer
+          path: build/bin/*-amd64-installer.exe
+          retention-days: 30
+
+  # ==================== macOS Build with Signing ====================
+  build-macos:
+    name: Build macOS ${{ matrix.goarch }}
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - goarch: amd64
+            artifact_name: ProcHub-darwin-amd64
+            asset_name: ProcHub-darwin-amd64.dmg
+          - goarch: arm64
+            artifact_name: ProcHub-darwin-arm64
+            asset_name: ProcHub-darwin-arm64.dmg
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm install
+
+      - name: Import Code Signing Certificates
+        if: ${{ env.APPLE_CERTIFICATE_BASE64 != '' }}
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          # Create temporary keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          # Create keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # Import certificate
+          echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security import $RUNNER_TEMP/certificate.p12 -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+          # Find signing identity
+          SIGNING_IDENTITY=$(security find-identity -v -p codesigning $KEYCHAIN_PATH | grep "Developer ID Application" | head -1 | awk -F'"' '{print $2}')
+          echo "SIGNING_IDENTITY=$SIGNING_IDENTITY" >> $GITHUB_ENV
+          echo "Found signing identity: $SIGNING_IDENTITY"
+
+      - name: Build Wails app
+        run: |
+          wails build -platform darwin/${{ matrix.goarch }} -trimpath -ldflags "-s -w"
+
+      - name: Sign macOS Application
+        if: ${{ env.SIGNING_IDENTITY != '' }}
+        run: |
+          APP_PATH="build/bin/ProcHub.app"
+
+          # Sign all frameworks and libraries first
+          find "$APP_PATH" -name "*.dylib" -o -name "*.framework" | while read lib; do
+            codesign --force --options runtime --sign "$SIGNING_IDENTITY" "$lib" || true
+          done
+
+          # Sign the main executable
+          codesign --force --options runtime --sign "$SIGNING_IDENTITY" "$APP_PATH/Contents/MacOS/ProcHub"
+
+          # Sign the entire app bundle
+          codesign --force --options runtime --sign "$SIGNING_IDENTITY" "$APP_PATH"
+
+          # Verify the signature
+          codesign --verify --verbose=4 "$APP_PATH"
+
+      - name: Create DMG
+        run: |
+          # Install create-dmg
+          brew install create-dmg
+
+          # Create DMG
+          create-dmg \
+            --volname "ProcHub" \
+            --volicon "build/bin/ProcHub.app/Contents/Resources/iconfile.icns" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "ProcHub.app" 150 185 \
+            --hide-extension "ProcHub.app" \
+            --app-drop-link 450 185 \
+            --no-internet-enable \
+            "${{ matrix.asset_name }}" \
+            "build/bin/ProcHub.app" || true
+
+          # Fallback: if create-dmg fails, use hdiutil
+          if [ ! -f "${{ matrix.asset_name }}" ]; then
+            hdiutil create -volname "ProcHub" -srcfolder "build/bin/ProcHub.app" -ov -format UDZO "${{ matrix.asset_name }}"
+          fi
+
+      - name: Sign DMG
+        if: ${{ env.SIGNING_IDENTITY != '' }}
+        run: |
+          codesign --force --sign "$SIGNING_IDENTITY" "${{ matrix.asset_name }}"
+
+      - name: Notarize macOS Application
+        if: ${{ env.SIGNING_IDENTITY != '' }}
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          # Submit for notarization
+          xcrun notarytool submit "${{ matrix.asset_name }}" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_ID_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+
+          # Staple the notarization ticket
+          xcrun stapler staple "${{ matrix.asset_name }}"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.asset_name }}
+          retention-days: 30
+
+      - name: Also create tar.gz for non-signed builds
+        run: |
+          cd build/bin
+          tar -czf ../../${{ matrix.artifact_name }}.tar.gz ProcHub.app
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}-tar
+          path: ${{ matrix.artifact_name }}.tar.gz
+          retention-days: 30
+
+  # ==================== macOS Universal Build ====================
+  build-macos-universal:
+    name: Build macOS Universal
+    runs-on: macos-latest
+    needs: [build-macos]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download amd64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ProcHub-darwin-amd64-tar
+          path: artifacts/amd64
+
+      - name: Download arm64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ProcHub-darwin-arm64-tar
+          path: artifacts/arm64
+
+      - name: Extract and create Universal Binary
+        run: |
+          # Extract both architectures
+          mkdir -p extracted/amd64 extracted/arm64
+          tar -xzf artifacts/amd64/ProcHub-darwin-amd64.tar.gz -C extracted/amd64
+          tar -xzf artifacts/arm64/ProcHub-darwin-arm64.tar.gz -C extracted/arm64
+
+          # Copy arm64 app as base
+          cp -R extracted/arm64/ProcHub.app universal-ProcHub.app
+
+          # Create universal binary using lipo
+          lipo -create \
+            extracted/amd64/ProcHub.app/Contents/MacOS/ProcHub \
+            extracted/arm64/ProcHub.app/Contents/MacOS/ProcHub \
+            -output universal-ProcHub.app/Contents/MacOS/ProcHub
+
+          # Verify universal binary
+          file universal-ProcHub.app/Contents/MacOS/ProcHub
+
+      - name: Import Code Signing Certificates
+        if: ${{ env.APPLE_CERTIFICATE_BASE64 != '' }}
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security import $RUNNER_TEMP/certificate.p12 -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+          SIGNING_IDENTITY=$(security find-identity -v -p codesigning $KEYCHAIN_PATH | grep "Developer ID Application" | head -1 | awk -F'"' '{print $2}')
+          echo "SIGNING_IDENTITY=$SIGNING_IDENTITY" >> $GITHUB_ENV
+
+      - name: Sign Universal App
+        if: ${{ env.SIGNING_IDENTITY != '' }}
+        run: |
+          codesign --force --options runtime --sign "$SIGNING_IDENTITY" universal-ProcHub.app/Contents/MacOS/ProcHub
+          codesign --force --options runtime --sign "$SIGNING_IDENTITY" universal-ProcHub.app
+          codesign --verify --verbose=4 universal-ProcHub.app
+
+      - name: Create Universal DMG
+        run: |
+          brew install create-dmg
+
+          create-dmg \
+            --volname "ProcHub" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "ProcHub.app" 150 185 \
+            --hide-extension "ProcHub.app" \
+            --app-drop-link 450 185 \
+            --no-internet-enable \
+            "ProcHub-darwin-universal.dmg" \
+            "universal-ProcHub.app" || true
+
+          if [ ! -f "ProcHub-darwin-universal.dmg" ]; then
+            hdiutil create -volname "ProcHub" -srcfolder "universal-ProcHub.app" -ov -format UDZO "ProcHub-darwin-universal.dmg"
+          fi
+
+      - name: Sign and Notarize Universal DMG
+        if: ${{ env.SIGNING_IDENTITY != '' }}
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          codesign --force --sign "$SIGNING_IDENTITY" "ProcHub-darwin-universal.dmg"
+
+          xcrun notarytool submit "ProcHub-darwin-universal.dmg" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_ID_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+
+          xcrun stapler staple "ProcHub-darwin-universal.dmg"
+
+      - name: Upload Universal DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: ProcHub-darwin-universal
+          path: ProcHub-darwin-universal.dmg
+          retention-days: 30
+
+  # ==================== Create Release ====================
+  create-release:
+    name: Create Release
+    needs: [build-linux, build-windows, build-macos, build-macos-universal]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display structure of downloaded files
+        run: ls -R artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+          # Linux
+          cp artifacts/ProcHub-linux-amd64/ProcHub-linux-amd64.tar.gz release/
+          cp artifacts/ProcHub-linux-arm64/ProcHub-linux-arm64.tar.gz release/
+          # Windows
+          cp artifacts/ProcHub-windows-amd64/ProcHub-windows-amd64.zip release/
+          cp artifacts/ProcHub-windows-amd64-installer/*.exe release/ || true
+          # macOS
+          cp artifacts/ProcHub-darwin-amd64/ProcHub-darwin-amd64.dmg release/
+          cp artifacts/ProcHub-darwin-arm64/ProcHub-darwin-arm64.dmg release/
+          cp artifacts/ProcHub-darwin-universal/ProcHub-darwin-universal.dmg release/
+
+          ls -la release/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            ## Release Notes
+
+            ${{ github.event.head_commit.message }}
+
+            ## Downloads
+
+            ### Windows
+            - `ProcHub-windows-amd64.zip` - Portable version
+            - `ProcHub-*-amd64-installer.exe` - NSIS Installer
+
+            ### Linux
+            - `ProcHub-linux-amd64.tar.gz` - x86_64
+            - `ProcHub-linux-arm64.tar.gz` - ARM64
+
+            ### macOS (Signed & Notarized)
+            - `ProcHub-darwin-universal.dmg` - Universal Binary (Intel + Apple Silicon) ⭐ Recommended
+            - `ProcHub-darwin-amd64.dmg` - Intel only
+            - `ProcHub-darwin-arm64.dmg` - Apple Silicon only
+
+            ## Installation
+
+            Please refer to the [README.md](https://github.com/${{ github.repository }}/blob/main/README.md) for detailed installation instructions.
+
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ==================== Notify Build Status ====================
+  notify:
+    name: Notify Build Status
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Check build status
+        run: |
+          if [ "${{ needs.build-linux.result }}" == "success" ] && \
+             [ "${{ needs.build-windows.result }}" == "success" ] && \
+             [ "${{ needs.build-macos.result }}" == "success" ]; then
+            echo "✅ All builds successful!"
+          else
+            echo "❌ Some builds failed!"
+            echo "Linux: ${{ needs.build-linux.result }}"
+            echo "Windows: ${{ needs.build-windows.result }}"
+            echo "macOS: ${{ needs.build-macos.result }}"
+            exit 1
+          fi
