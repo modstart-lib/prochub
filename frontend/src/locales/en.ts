@@ -3,6 +3,10 @@ export default {
     name: 'Prochub',
     tagline: 'Process Control Desk',
   },
+  common: {
+    yes: 'Yes',
+    no: 'No',
+  },
   actions: {
     addProcess: 'Add Process',
     viewAll: 'View All',

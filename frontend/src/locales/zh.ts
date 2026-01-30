@@ -3,6 +3,10 @@ export default {
     name: 'Prochub',
     tagline: '进程调度中心',
   },
+  common: {
+    yes: '是',
+    no: '否',
+  },
   actions: {
     addProcess: '新增进程',
     viewAll: '查看全部',

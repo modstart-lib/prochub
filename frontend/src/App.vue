@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ConfigProvider, message, theme } from 'ant-design-vue'
+import { ConfigProvider, message, Modal, theme } from 'ant-design-vue'
 import enUS from 'ant-design-vue/es/locale/en_US'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
 import { computed, onMounted } from 'vue'
@@ -21,7 +21,19 @@ onMounted(() => {
     try {
       const versionInfo = await CheckVersion()
       if (versionInfo.version !== currentVersion) {
-        message.info(appStore.t('settings.version.newVersion').replace('{version}', versionInfo.version))
+        if (versionInfo.url) {
+          Modal.confirm({
+            title: appStore.t('settings.version.updateAvailable'),
+            content: appStore.t('settings.version.updateConfirm').replace('{version}', versionInfo.version),
+            okText: appStore.t('common.yes'),
+            cancelText: appStore.t('common.no'),
+            onOk() {
+              window.open(versionInfo.url, '_blank')
+            },
+          })
+        } else {
+          message.info(appStore.t('settings.version.newVersion').replace('{version}', versionInfo.version))
+        }
       }
     } catch (e) {
       console.error('Auto version check failed:', e)
