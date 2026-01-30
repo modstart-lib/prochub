@@ -10,6 +10,7 @@ type AppConfig struct {
 	MaxLogFiles   int                  `json:"maxLogFiles"`
 	MaxRestart    int                  `json:"maxRestart"`
 	RestartPolicy string               `json:"restartPolicy"`
+	DeviceUUID    string               `json:"deviceUUID"`
 	Processes     []process.Definition `json:"processes"`
 }
 

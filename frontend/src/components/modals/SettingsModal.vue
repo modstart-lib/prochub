@@ -3,9 +3,17 @@ import { Card, Divider, Modal, RadioButton, RadioGroup, Select, Switch } from 'a
 import { Globe, Info, Languages, Moon, Power, Sun } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import { GetConfig, UpdateConfig } from '../../../wailsjs/go/main/App';
+import { trackVisit } from '../../services/analytics';
 import { useAppStore } from '../../stores/app';
 
 const props = defineProps<{ visible: boolean }>()
+
+// Track visit when modal opens
+watch(() => props.visible, (visible) => {
+  if (visible) {
+    trackVisit('Settings')
+  }
+})
 const emit = defineEmits<{ 'update:visible': [boolean] }>()
 const appStore = useAppStore()
 

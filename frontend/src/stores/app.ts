@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import * as AppAPI from '../../wailsjs/go/main/App'
 import { process as ProcessModels } from '../../wailsjs/go/models'
 import { i18n } from '../plugins/i18n'
+import { trackError } from '../services/analytics'
 
 export type ProcessStatus = 'running' | 'stopped' | 'errored' | 'starting'
 
@@ -62,6 +63,8 @@ export const useAppStore = defineStore('app', () => {
         lastError: snap.lastError || '',
       }))
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      trackError(`Failed to load processes: ${errorMsg}`)
       console.error('Failed to load processes:', error)
     }
   }
@@ -72,6 +75,8 @@ export const useAppStore = defineStore('app', () => {
       await AppAPI.AddProcess(definition)
       await loadProcesses()
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      trackError(`Failed to add process: ${errorMsg}`)
       console.error('Failed to add process:', error)
       throw error
     }
@@ -83,6 +88,8 @@ export const useAppStore = defineStore('app', () => {
       await AppAPI.RemoveProcess(id)
       await loadProcesses()
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      trackError(`Failed to remove process: ${errorMsg}`)
       console.error('Failed to remove process:', error)
       throw error
     }
@@ -94,6 +101,8 @@ export const useAppStore = defineStore('app', () => {
       await AppAPI.UpdateProcess(id, definition)
       await loadProcesses()
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      trackError(`Failed to update process: ${errorMsg}`)
       console.error('Failed to update process:', error)
       throw error
     }
@@ -106,6 +115,8 @@ export const useAppStore = defineStore('app', () => {
       // Refresh after a short delay to get updated status
       setTimeout(loadProcesses, 500)
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      trackError(`Failed to start process: ${errorMsg}`)
       console.error('Failed to start process:', error)
       throw error
     }
@@ -117,6 +128,8 @@ export const useAppStore = defineStore('app', () => {
       await AppAPI.StopProcess(id)
       setTimeout(loadProcesses, 500)
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      trackError(`Failed to stop process: ${errorMsg}`)
       console.error('Failed to stop process:', error)
       throw error
     }
@@ -128,6 +141,8 @@ export const useAppStore = defineStore('app', () => {
       await AppAPI.RestartProcess(id)
       setTimeout(loadProcesses, 500)
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      trackError(`Failed to restart process: ${errorMsg}`)
       console.error('Failed to restart process:', error)
       throw error
     }
@@ -151,6 +166,8 @@ export const useAppStore = defineStore('app', () => {
         return `[${timestamp}] ${entry.stream}: ${entry.line}`
       })
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      trackError(`Failed to load logs: ${errorMsg}`)
       console.error('Failed to load logs:', error)
     }
   }

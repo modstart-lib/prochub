@@ -2,12 +2,18 @@
 import { ConfigProvider, theme } from 'ant-design-vue'
 import enUS from 'ant-design-vue/es/locale/en_US'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import DashboardSummary from './components/layout/DashboardSummary.vue'
 import ProcessList from './components/layout/ProcessList.vue'
+import { trackVisit } from './services/analytics'
 import { useAppStore } from './stores/app'
 
 const appStore = useAppStore()
+
+// Track main page visit on mount
+onMounted(() => {
+  trackVisit('Main')
+})
 
 const antLocale = computed(() => {
   return appStore.locale === 'zh' ? zhCN : enUS

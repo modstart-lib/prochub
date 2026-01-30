@@ -4,9 +4,17 @@ import { Folder, FolderOpen, Minus, Plus, Settings2, Terminal, Trash2, Variable 
 import { reactive, ref, watch } from 'vue'
 import * as AppAPI from '../../../wailsjs/go/main/App'
 import { process as ProcessModels } from '../../../wailsjs/go/models'
+import { trackVisit } from '../../services/analytics'
 import { useAppStore, type ProcessItem } from '../../stores/app'
 
 const props = defineProps<{ visible: boolean; process: ProcessItem | null }>()
+
+// Track visit when modal opens
+watch(() => props.visible, (visible) => {
+  if (visible) {
+    trackVisit('EditProcess')
+  }
+})
 const emit = defineEmits<{ 'update:visible': [boolean] }>()
 const appStore = useAppStore()
 

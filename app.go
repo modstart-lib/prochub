@@ -1,10 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	goruntime "runtime"
+	"strings"
 	"time"
 
 	"prochub/app/config"
@@ -13,6 +19,7 @@ import (
 	"prochub/app/service"
 	"prochub/app/store"
 
+	"github.com/google/uuid"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -273,6 +280,148 @@ func (a *App) GetPlatform() string {
 // GetProcess returns a single process by ID
 func (a *App) GetProcess(id string) (process.Snapshot, error) {
 	return a.pm.Get(id)
+}
+
+// AnalyticsEvent represents an analytics event to be sent
+type AnalyticsEvent struct {
+	Name string                 `json:"name"`
+	Data map[string]interface{} `json:"data,omitempty"`
+}
+
+// AnalyticsPayload is the request body format for analytics
+type AnalyticsPayload struct {
+	Data []AnalyticsEvent `json:"data"`
+}
+
+const (
+	analyticsURL     = "https://open.modstart.com/open_collect"
+	appVersion       = "0.1.0"
+	analyticsAppName = "ProcHub"
+)
+
+// getDeviceUUID returns a persistent UUID for this device
+func (a *App) getDeviceUUID() string {
+	// Try to load existing UUID from config
+	if a.config.DeviceUUID != "" {
+		return a.config.DeviceUUID
+	}
+
+	// Generate new UUID
+	newUUID := uuid.New().String()
+	a.config.DeviceUUID = newUUID
+
+	// Save to config
+	a.store.Save(a.config)
+
+	return newUUID
+}
+
+// getPlatform returns the current platform name
+func getPlatform() string {
+	switch goruntime.GOOS {
+	case "darwin":
+		return "macOS"
+	case "windows":
+		return "Windows"
+	case "linux":
+		return "Linux"
+	default:
+		return goruntime.GOOS
+	}
+}
+
+// getPlatformArch returns the current platform architecture
+func getPlatformArch() string {
+	switch goruntime.GOARCH {
+	case "amd64":
+		return "x64"
+	case "arm64":
+		return "arm64"
+	case "386":
+		return "x86"
+	default:
+		return goruntime.GOARCH
+	}
+}
+
+// getPlatformVersion returns the OS version
+func getPlatformVersion() string {
+	switch goruntime.GOOS {
+	case "darwin":
+		// macOS: use sw_vers command
+		out, err := exec.Command("sw_vers", "-productVersion").Output()
+		if err == nil {
+			return strings.TrimSpace(string(out))
+		}
+	case "windows":
+		// Windows: use cmd /c ver
+		out, err := exec.Command("cmd", "/c", "ver").Output()
+		if err == nil {
+			// Parse "Microsoft Windows [Version 10.0.19041.1234]"
+			s := string(out)
+			if start := strings.Index(s, "[Version "); start != -1 {
+				s = s[start+9:]
+				if end := strings.Index(s, "]"); end != -1 {
+					return strings.TrimSpace(s[:end])
+				}
+			}
+		}
+	case "linux":
+		// Linux: try /etc/os-release
+		data, err := os.ReadFile("/etc/os-release")
+		if err == nil {
+			for _, line := range strings.Split(string(data), "\n") {
+				if strings.HasPrefix(line, "VERSION_ID=") {
+					v := strings.TrimPrefix(line, "VERSION_ID=")
+					return strings.Trim(v, "\"")
+				}
+			}
+		}
+	}
+	return "0"
+}
+
+// SendAnalytics sends analytics events to the collection endpoint
+func (a *App) SendAnalytics(events []AnalyticsEvent) {
+	go func() {
+		client := &http.Client{Timeout: 10 * time.Second}
+
+		// Build User-Agent: Open/{AppName}/{Version}/{Platform}/{PlatformArch}/{PlatformVersion}/{UUID}
+		userAgent := fmt.Sprintf("Open/%s/%s/%s/%s/%s/%s",
+			analyticsAppName,
+			appVersion,
+			getPlatform(),
+			getPlatformArch(),
+			getPlatformVersion(),
+			a.getDeviceUUID(),
+		)
+
+		// Build payload with data array
+		payload := AnalyticsPayload{Data: events}
+		jsonData, err := json.Marshal(payload)
+		if err != nil {
+			fmt.Printf("[Analytics] Failed to marshal payload: %v\n", err)
+			return
+		}
+
+		req, err := http.NewRequest("POST", analyticsURL, bytes.NewBuffer(jsonData))
+		if err != nil {
+			fmt.Printf("[Analytics] Failed to create request: %v\n", err)
+			return
+		}
+
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("User-Agent", userAgent)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Printf("[Analytics] Failed to send request: %v\n", err)
+			return
+		}
+		defer resp.Body.Close()
+
+		fmt.Printf("[Analytics] Response status: %d\n", resp.StatusCode)
+	}()
 }
 
 // SaveLogsToFile opens a save dialog and saves logs to the selected file

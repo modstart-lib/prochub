@@ -4,9 +4,17 @@ import { FileSearch, Folder, FolderOpen, Minus, Plus, Settings2, Terminal, Varia
 import { reactive, ref, watch } from 'vue'
 import * as AppAPI from '../../../wailsjs/go/main/App'
 import { process as ProcessModels } from '../../../wailsjs/go/models'
+import { trackVisit } from '../../services/analytics'
 import { useAppStore } from '../../stores/app'
 
 const props = defineProps<{ visible: boolean }>()
+
+// Track visit when modal opens
+watch(() => props.visible, (visible) => {
+  if (visible) {
+    trackVisit('AddProcess')
+  }
+})
 const emit = defineEmits<{ 'update:visible': [boolean] }>()
 const appStore = useAppStore()
 

@@ -3,6 +3,7 @@ import { Button, Empty, Input, Modal, Switch, Tooltip } from 'ant-design-vue';
 import { ArrowDown, Download, Filter, RefreshCw, Search, Terminal } from 'lucide-vue-next';
 import { computed, nextTick, ref, watch } from 'vue';
 import { SaveLogsToFile } from '../../../wailsjs/go/main/App';
+import { trackVisit } from '../../services/analytics';
 import { useAppStore } from '../../stores/app';
 
 const props = defineProps<{ 
@@ -10,6 +11,13 @@ const props = defineProps<{
   processId: string
   processName: string
 }>()
+
+// Track visit when modal opens
+watch(() => props.visible, (visible) => {
+  if (visible) {
+    trackVisit('Logs')
+  }
+})
 const emit = defineEmits<{ 'update:visible': [boolean] }>()
 const appStore = useAppStore()
 
