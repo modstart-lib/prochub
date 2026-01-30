@@ -22,8 +22,11 @@ ICNS_OUTPUT_BUNDLE="${BUILD_DIR}/bin/ProcHub.app/Contents/Resources/iconfile.icn
 # Windows 图标路径
 WINDOWS_ICO="${BUILD_DIR}/windows/icon.ico"
 
-# Tray 图标路径（macOS 标准黑白模板图标）
+# Tray 图标路径
+# macOS: 黑白模板图标 (PNG)
+# Windows: 彩色图标 (ICO)
 TRAY_ICON="${BUILD_DIR}/trayicon.png"
+TRAY_ICON_WINDOWS="${BUILD_DIR}/trayicon_windows.ico"
 
 # 检查源文件是否存在
 if [ ! -f "$SVG_SOURCE" ]; then
@@ -144,6 +147,33 @@ rm -f "$TRAY_SVG_TEMP"
 
 echo "   - trayicon.png: $TRAY_ICON"
 
+# 生成 Windows Tray 图标（彩色 ICO 格式）
+# Windows 托盘图标标准：
+# - 彩色图标，支持透明背景
+# - 推荐尺寸：16x16, 24x24, 32x32, 48x48
+echo "🪟 生成 Windows Tray 图标（彩色 ICO）..."
+
+# 创建临时目录存放各尺寸的 PNG
+WIN_TRAY_ICONSET_DIR="${BUILD_DIR}/windows_tray_iconset_temp"
+mkdir -p "$WIN_TRAY_ICONSET_DIR"
+
+# Windows 托盘图标标准尺寸
+declare -a WIN_TRAY_SIZES=(16 24 32 48)
+
+for size in "${WIN_TRAY_SIZES[@]}"; do
+    # 托盘图标不需要太多留白，使用 85% 的尺寸
+    inner_size=$(( size * 85 / 100 ))
+    magick -background none -density 300 "$SVG_SOURCE" -resize "${inner_size}x${inner_size}" -gravity center -extent "${size}x${size}" "${WIN_TRAY_ICONSET_DIR}/icon_${size}.png"
+done
+
+# 使用 ImageMagick 将多个 PNG 合并为 ICO 文件
+magick "${WIN_TRAY_ICONSET_DIR}/icon_16.png" "${WIN_TRAY_ICONSET_DIR}/icon_24.png" "${WIN_TRAY_ICONSET_DIR}/icon_32.png" "${WIN_TRAY_ICONSET_DIR}/icon_48.png" "$TRAY_ICON_WINDOWS"
+
+# 清理临时目录
+rm -rf "$WIN_TRAY_ICONSET_DIR"
+
+echo "   - trayicon_windows.ico: $TRAY_ICON_WINDOWS"
+
 # 清理临时文件
 echo "🧹 清理临时文件..."
 rm -rf "$ICONSET_DIR"
@@ -155,6 +185,7 @@ echo "   - appicon.png: $APPICON_PNG"
 echo "   - iconfile.icns: $ICNS_OUTPUT"
 echo "   - icon.ico: $WINDOWS_ICO"
 echo "   - trayicon.png: $TRAY_ICON"
+echo "   - trayicon_windows.ico: $TRAY_ICON_WINDOWS"
 if [ -f "$ICNS_OUTPUT_BUNDLE" ]; then
     echo "   - app bundle icns: $ICNS_OUTPUT_BUNDLE"
     echo ""

@@ -37,7 +37,14 @@ func isChineseLocale() bool {
 
 // onReady is called when systray is ready
 func (t *TrayManager) onReady() {
-	systray.SetIcon(trayIcon)
+	// Use different tray icons for different platforms
+	// macOS: Black template icon (transparent background)
+	// Windows: Colored ICO format icon
+	if goruntime.GOOS == "windows" {
+		systray.SetIcon(trayIconWindows)
+	} else {
+		systray.SetIcon(trayIcon)
+	}
 	systray.SetTooltip("ProcHub - Process Manager")
 
 	// Create menu items with localized labels

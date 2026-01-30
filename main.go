@@ -26,6 +26,9 @@ var icon []byte
 //go:embed build/trayicon.png
 var trayIcon []byte
 
+//go:embed build/trayicon_windows.ico
+var trayIconWindows []byte
+
 // Global app reference for tray menu callbacks
 var globalApp *App
 var trayManager *TrayManager
