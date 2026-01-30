@@ -1,10 +1,10 @@
 <script lang="ts" setup>
 import { Button, Card, Divider, Modal, RadioButton, RadioGroup, Select, Switch } from 'ant-design-vue';
 import { Globe, Info, Languages, Moon, Power, RefreshCw, Sun } from 'lucide-vue-next';
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { GetConfig, UpdateConfig } from '../../../wailsjs/go/main/App';
 import { trackVisit } from '../../services/analytics';
-import { checkVersionAndPrompt, currentVersion } from '../../services/version';
+import { checkVersionAndPrompt, getAppVersion } from '../../services/version';
 import { useAppStore } from '../../stores/app';
 
 const props = defineProps<{ visible: boolean }>()
@@ -38,6 +38,12 @@ const languageOptions = [
 ]
 
 const autoStart = ref(false)
+const appVersion = ref('')
+
+// Load appVersion on mount
+onMounted(async () => {
+  appVersion.value = await getAppVersion()
+})
 
 // Load autoStart config when modal opens
 watch(() => props.visible, async (visible) => {
@@ -174,7 +180,7 @@ const handleCheckVersion = async () => {
         </div>
         <div class="section-control">
           <div class="version-control">
-            <span class="current-version">{{ appStore.t('settings.version.currentVersion') }}: {{ currentVersion }}</span>
+            <span class="current-version">{{ appStore.t('settings.version.currentVersion') }}: {{ appVersion }}</span>
             <Button 
               type="primary" 
               size="small"

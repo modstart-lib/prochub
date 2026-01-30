@@ -277,6 +277,11 @@ func (a *App) GetPlatform() string {
 	return a.autoStartMgr.GetPlatform()
 }
 
+// GetAppVersion returns the current app version
+func (a *App) GetAppVersion() string {
+	return appVersion
+}
+
 // GetProcess returns a single process by ID
 func (a *App) GetProcess(id string) (process.Snapshot, error) {
 	return a.pm.Get(id)
@@ -294,7 +299,8 @@ type AnalyticsPayload struct {
 }
 
 const (
-	analyticsURL     = "https://open.modstart.com/open_collect"
+	openBaseURL      = "https://open.modstart.com"
+	analyticsURL     = openBaseURL + "/open_collect"
 	appVersion       = "0.1.0"
 	analyticsAppName = "ProcHub"
 )
@@ -476,7 +482,7 @@ type versionCheckResponse struct {
 	Data VersionInfo `json:"data"`
 }
 
-const versionCheckURL = "http://open.demo.soft.host/open_version/check"
+const versionCheckURL = openBaseURL + "/open_version/check"
 
 // CheckVersion checks for new version from the server
 func (a *App) CheckVersion() (VersionInfo, error) {

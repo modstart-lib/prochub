@@ -1,9 +1,19 @@
 import { Modal, message } from 'ant-design-vue'
-import { CheckVersion } from '../../wailsjs/go/main/App'
+import { CheckVersion, GetAppVersion } from '../../wailsjs/go/main/App'
 import { BrowserOpenURL } from '../../wailsjs/runtime/runtime'
 import { useAppStore } from '../stores/app'
 
-export const currentVersion = 'v1.0.0'
+// Cache for app version
+let cachedAppVersion: string | null = null
+
+// Get app version from backend (cached)
+export async function getAppVersion(): Promise<string> {
+  if (cachedAppVersion) {
+    return cachedAppVersion
+  }
+  cachedAppVersion = await GetAppVersion()
+  return cachedAppVersion
+}
 
 export interface VersionCheckOptions {
   /** Whether to show message when already on latest version */
@@ -20,6 +30,7 @@ export async function checkVersionAndPrompt(options: VersionCheckOptions = {}): 
   const appStore = useAppStore()
 
   try {
+    const currentVersion = await getAppVersion()
     let versionInfo = await CheckVersion()
     
     // Handle case where response is a JSON string
