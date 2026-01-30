@@ -420,7 +420,6 @@ func (a *App) SendAnalytics(events []AnalyticsEvent) {
 		}
 		defer resp.Body.Close()
 
-		fmt.Printf("[Analytics] Response status: %d\n", resp.StatusCode)
 	}()
 }
 
@@ -461,6 +460,58 @@ func (a *App) HideWindow() {
 // QuitApp quits the application
 func (a *App) QuitApp() {
 	runtime.Quit(a.ctx)
+}
+
+// VersionInfo represents version information from the server
+type VersionInfo struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+	Time    string `json:"time"`
+	Url     string `json:"url,omitempty"`
+}
+
+// versionCheckResponse is the API response format
+type versionCheckResponse struct {
+	Code int         `json:"code"`
+	Data VersionInfo `json:"data"`
+}
+
+const versionCheckURL = "http://open.demo.soft.host/open_version/check"
+
+// CheckVersion checks for new version from the server
+func (a *App) CheckVersion() (VersionInfo, error) {
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	// Build form data
+	formData := "name=ProcHub"
+
+	req, err := http.NewRequest("POST", versionCheckURL, strings.NewReader(formData))
+	if err != nil {
+		return VersionInfo{}, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return VersionInfo{}, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return VersionInfo{}, fmt.Errorf("HTTP error: status %d", resp.StatusCode)
+	}
+
+	var result versionCheckResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return VersionInfo{}, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if result.Code != 0 {
+		return VersionInfo{}, fmt.Errorf("API error: code %d", result.Code)
+	}
+
+	return result.Data, nil
 }
 
 // shutdown is called when the app is closing

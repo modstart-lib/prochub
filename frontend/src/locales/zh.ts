@@ -118,6 +118,18 @@ export default {
       title: '开机自动启动',
       desc: '系统启动时自动运行 ProcHub',
     },
+    version: {
+      title: '版本更新',
+      desc: '检测是否有新版本可用',
+      checkUpdate: '检测更新',
+      checking: '检测中...',
+      latestVersion: '当前已是最新版本',
+      newVersion: '发现新版本: {version}',
+      checkFailed: '检测更新失败',
+      currentVersion: '当前版本',
+      updateAvailable: '发现新版本',
+      updateConfirm: '发现新版本 {version}，是否打开浏览器下载？',
+    },
   },
   env: {
     title: '环境变量库',

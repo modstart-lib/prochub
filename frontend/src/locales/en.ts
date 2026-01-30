@@ -118,6 +118,18 @@ export default {
       title: 'Launch at Startup',
       desc: 'Automatically start ProcHub when system boots',
     },
+    version: {
+      title: 'Version Update',
+      desc: 'Check if a new version is available',
+      checkUpdate: 'Check Update',
+      checking: 'Checking...',
+      latestVersion: 'You are using the latest version',
+      newVersion: 'New version available: {version}',
+      checkFailed: 'Failed to check for updates',
+      currentVersion: 'Current version',
+      updateAvailable: 'Update Available',
+      updateConfirm: 'New version {version} is available. Open browser to download?',
+    },
   },
   env: {
     title: 'Environment Vault',

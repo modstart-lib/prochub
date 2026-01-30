@@ -1,8 +1,9 @@
 <script lang="ts" setup>
-import { Card, Divider, Modal, RadioButton, RadioGroup, Select, Switch } from 'ant-design-vue';
-import { Globe, Info, Languages, Moon, Power, Sun } from 'lucide-vue-next';
+import { Button, Card, Divider, Modal, RadioButton, RadioGroup, Select, Switch, message } from 'ant-design-vue';
+import { Globe, Info, Languages, Moon, Power, RefreshCw, Sun } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
-import { GetConfig, UpdateConfig } from '../../../wailsjs/go/main/App';
+import { CheckVersion, GetConfig, UpdateConfig } from '../../../wailsjs/go/main/App';
+import { main } from '../../../wailsjs/go/models';
 import { trackVisit } from '../../services/analytics';
 import { useAppStore } from '../../stores/app';
 
@@ -58,6 +59,41 @@ const toggleAutoStart = async (checked: boolean | string | number) => {
     autoStart.value = !!checked
   } catch (e) {
     console.error('Failed to update autoStart:', e)
+  }
+}
+
+// Version check state
+const versionChecking = ref(false)
+const versionInfo = ref<main.VersionInfo | null>(null)
+const currentVersion = 'v1.0.0'
+
+const handleCheckVersion = async () => {
+  versionChecking.value = true
+  versionInfo.value = null
+  try {
+    const result = await CheckVersion()
+    versionInfo.value = result
+    if (result.version === currentVersion) {
+      message.success(appStore.t('settings.version.latestVersion'))
+    } else {
+      message.info(appStore.t('settings.version.newVersion').replace('{version}', result.version))
+      if (result.url) {
+        Modal.confirm({
+          title: appStore.t('settings.version.updateAvailable'),
+          content: appStore.t('settings.version.updateConfirm').replace('{version}', result.version),
+          okText: appStore.t('common.yes'),
+          cancelText: appStore.t('common.no'),
+          onOk() {
+            window.open(result.url, '_blank')
+          },
+        })
+      }
+    }
+  } catch (e) {
+    console.error('Failed to check version:', e)
+    message.error(appStore.t('settings.version.checkFailed'))
+  } finally {
+    versionChecking.value = false
   }
 }
 </script>
@@ -148,6 +184,40 @@ const toggleAutoStart = async (checked: boolean | string | number) => {
 
       <Divider class="section-divider" />
 
+      <!-- 版本检测 -->
+      <div class="setting-section">
+        <div class="section-header">
+          <div class="section-icon version-icon">
+            <RefreshCw :size="18" />
+          </div>
+          <div class="section-info">
+            <h3 class="section-title">{{ appStore.t('settings.version.title') }}</h3>
+            <p class="section-desc">{{ appStore.t('settings.version.desc') }}</p>
+          </div>
+        </div>
+        <div class="section-control">
+          <div class="version-control">
+            <span class="current-version">{{ appStore.t('settings.version.currentVersion') }}: {{ currentVersion }}</span>
+            <Button 
+              type="primary" 
+              size="small"
+              :loading="versionChecking"
+              @click="handleCheckVersion"
+            >
+              <template #icon>
+                <RefreshCw :size="14" v-if="!versionChecking" />
+              </template>
+              {{ versionChecking ? appStore.t('settings.version.checking') : appStore.t('settings.version.checkUpdate') }}
+            </Button>
+          </div>
+          <div v-if="versionInfo && versionInfo.version !== currentVersion" class="version-info">
+            <span class="new-version">{{ appStore.t('settings.version.newVersion').replace('{version}', versionInfo.version) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <Divider class="section-divider" />
+
       <!-- 关于 -->
       <Card class="about-card" :bordered="false">
         <template #title>
@@ -208,6 +278,10 @@ const toggleAutoStart = async (checked: boolean | string | number) => {
   @apply bg-green-100 text-green-600 dark:bg-green-900/50 dark:text-green-400;
 }
 
+.version-icon {
+  @apply bg-purple-100 text-purple-600 dark:bg-purple-900/50 dark:text-purple-400;
+}
+
 .section-info {
   @apply flex flex-col;
 }
@@ -234,6 +308,26 @@ const toggleAutoStart = async (checked: boolean | string | number) => {
 
 .language-select {
   @apply w-40;
+}
+
+.version-control {
+  @apply flex items-center gap-3;
+}
+
+.current-version {
+  @apply text-xs text-slate-500 dark:text-slate-400;
+}
+
+.version-info {
+  @apply mt-2 flex flex-col gap-1;
+}
+
+.new-version {
+  @apply text-sm font-medium text-indigo-600 dark:text-indigo-400;
+}
+
+.release-time {
+  @apply text-xs text-slate-500 dark:text-slate-400;
 }
 
 .section-divider {
