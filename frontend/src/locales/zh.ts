@@ -106,7 +106,7 @@ export default {
     subtitle: '个性化控制台体验。',
     language: '语言',
     about: '关于',
-    aboutDesc: 'ProcHub 是基于 Wails 的跨平台进程管理工具。',
+    aboutDesc: 'ProcHub - 跨平台进程管理工具',
     theme: {
       title: '主题',
       desc: '选择您喜欢的主题',

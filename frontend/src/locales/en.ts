@@ -106,7 +106,7 @@ export default {
     subtitle: 'Personalize your console experience.',
     language: 'Language',
     about: 'About',
-    aboutDesc: 'ProcHub is a cross-platform process manager built with Wails.',
+    aboutDesc: 'ProcHub - cross-platform process manager',
     theme: {
       title: 'Theme',
       desc: 'Choose your preferred theme',

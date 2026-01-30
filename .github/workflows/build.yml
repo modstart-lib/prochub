@@ -176,10 +176,9 @@ jobs:
           npm install
 
       - name: Import Code Signing Certificates
-        if: ${{ env.APPLE_CERTIFICATE_BASE64 != '' }}
         env:
-          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          CORP_MACOS_CERTIFICATE: ${{ secrets.CORP_MACOS_CERTIFICATE }}
+          CORP_MACOS_CERTIFICATE_PASSWORD: ${{ secrets.CORP_MACOS_CERTIFICATE_PASSWORD }}
         run: |
           # Create temporary keychain
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
@@ -191,8 +190,8 @@ jobs:
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
 
           # Import certificate
-          echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > $RUNNER_TEMP/certificate.p12
-          security import $RUNNER_TEMP/certificate.p12 -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          echo "$CORP_MACOS_CERTIFICATE" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security import $RUNNER_TEMP/certificate.p12 -P "$CORP_MACOS_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
 
@@ -206,7 +205,6 @@ jobs:
           wails build -platform darwin/${{ matrix.goarch }} -trimpath -ldflags "-s -w"
 
       - name: Sign macOS Application
-        if: ${{ env.SIGNING_IDENTITY != '' }}
         run: |
           APP_PATH="build/bin/ProcHub.app"
 
@@ -249,21 +247,19 @@ jobs:
           fi
 
       - name: Sign DMG
-        if: ${{ env.SIGNING_IDENTITY != '' }}
         run: |
           codesign --force --sign "$SIGNING_IDENTITY" "${{ matrix.asset_name }}"
 
       - name: Notarize macOS Application
-        if: ${{ env.SIGNING_IDENTITY != '' }}
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           # Submit for notarization
           xcrun notarytool submit "${{ matrix.asset_name }}" \
             --apple-id "$APPLE_ID" \
-            --password "$APPLE_ID_PASSWORD" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
             --wait
 
@@ -277,137 +273,12 @@ jobs:
           path: ${{ matrix.asset_name }}
           retention-days: 30
 
-      - name: Also create tar.gz for non-signed builds
-        run: |
-          cd build/bin
-          tar -czf ../../${{ matrix.artifact_name }}.tar.gz ProcHub.app
 
-      - name: Upload tar.gz artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact_name }}-tar
-          path: ${{ matrix.artifact_name }}.tar.gz
-          retention-days: 30
-
-  # ==================== macOS Universal Build ====================
-  build-macos-universal:
-    name: Build macOS Universal
-    runs-on: macos-latest
-    needs: [build-macos]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Download amd64 artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ProcHub-darwin-amd64-tar
-          path: artifacts/amd64
-
-      - name: Download arm64 artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ProcHub-darwin-arm64-tar
-          path: artifacts/arm64
-
-      - name: Extract and create Universal Binary
-        run: |
-          # Extract both architectures
-          mkdir -p extracted/amd64 extracted/arm64
-          tar -xzf artifacts/amd64/ProcHub-darwin-amd64.tar.gz -C extracted/amd64
-          tar -xzf artifacts/arm64/ProcHub-darwin-arm64.tar.gz -C extracted/arm64
-
-          # Copy arm64 app as base
-          cp -R extracted/arm64/ProcHub.app universal-ProcHub.app
-
-          # Create universal binary using lipo
-          lipo -create \
-            extracted/amd64/ProcHub.app/Contents/MacOS/ProcHub \
-            extracted/arm64/ProcHub.app/Contents/MacOS/ProcHub \
-            -output universal-ProcHub.app/Contents/MacOS/ProcHub
-
-          # Verify universal binary
-          file universal-ProcHub.app/Contents/MacOS/ProcHub
-
-      - name: Import Code Signing Certificates
-        if: ${{ env.APPLE_CERTIFICATE_BASE64 != '' }}
-        env:
-          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-        run: |
-          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
-
-          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-
-          echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > $RUNNER_TEMP/certificate.p12
-          security import $RUNNER_TEMP/certificate.p12 -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security list-keychain -d user -s $KEYCHAIN_PATH
-
-          SIGNING_IDENTITY=$(security find-identity -v -p codesigning $KEYCHAIN_PATH | grep "Developer ID Application" | head -1 | awk -F'"' '{print $2}')
-          echo "SIGNING_IDENTITY=$SIGNING_IDENTITY" >> $GITHUB_ENV
-
-      - name: Sign Universal App
-        if: ${{ env.SIGNING_IDENTITY != '' }}
-        run: |
-          codesign --force --options runtime --sign "$SIGNING_IDENTITY" universal-ProcHub.app/Contents/MacOS/ProcHub
-          codesign --force --options runtime --sign "$SIGNING_IDENTITY" universal-ProcHub.app
-          codesign --verify --verbose=4 universal-ProcHub.app
-
-      - name: Create Universal DMG
-        run: |
-          brew install create-dmg
-
-          create-dmg \
-            --volname "ProcHub" \
-            --window-pos 200 120 \
-            --window-size 600 400 \
-            --icon-size 100 \
-            --icon "ProcHub.app" 150 185 \
-            --hide-extension "ProcHub.app" \
-            --app-drop-link 450 185 \
-            --no-internet-enable \
-            "ProcHub-darwin-universal.dmg" \
-            "universal-ProcHub.app" || true
-
-          if [ ! -f "ProcHub-darwin-universal.dmg" ]; then
-            hdiutil create -volname "ProcHub" -srcfolder "universal-ProcHub.app" -ov -format UDZO "ProcHub-darwin-universal.dmg"
-          fi
-
-      - name: Sign and Notarize Universal DMG
-        if: ${{ env.SIGNING_IDENTITY != '' }}
-        env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          codesign --force --sign "$SIGNING_IDENTITY" "ProcHub-darwin-universal.dmg"
-
-          xcrun notarytool submit "ProcHub-darwin-universal.dmg" \
-            --apple-id "$APPLE_ID" \
-            --password "$APPLE_ID_PASSWORD" \
-            --team-id "$APPLE_TEAM_ID" \
-            --wait
-
-          xcrun stapler staple "ProcHub-darwin-universal.dmg"
-
-      - name: Upload Universal DMG
-        uses: actions/upload-artifact@v4
-        with:
-          name: ProcHub-darwin-universal
-          path: ProcHub-darwin-universal.dmg
-          retention-days: 30
 
   # ==================== Create Release ====================
   create-release:
     name: Create Release
-    needs: [build-linux, build-windows, build-macos, build-macos-universal]
+    needs: [build-linux, build-windows, build-macos]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     permissions:
@@ -437,7 +308,6 @@ jobs:
           # macOS
           cp artifacts/ProcHub-darwin-amd64/ProcHub-darwin-amd64.dmg release/
           cp artifacts/ProcHub-darwin-arm64/ProcHub-darwin-arm64.dmg release/
-          cp artifacts/ProcHub-darwin-universal/ProcHub-darwin-universal.dmg release/
 
           ls -la release/
 
@@ -464,9 +334,8 @@ jobs:
             - `ProcHub-linux-arm64.tar.gz` - ARM64
 
             ### macOS (Signed & Notarized)
-            - `ProcHub-darwin-universal.dmg` - Universal Binary (Intel + Apple Silicon) ⭐ Recommended
-            - `ProcHub-darwin-amd64.dmg` - Intel only
-            - `ProcHub-darwin-arm64.dmg` - Apple Silicon only
+            - `ProcHub-darwin-arm64.dmg` - Apple Silicon ⭐ Recommended for M1/M2/M3
+            - `ProcHub-darwin-amd64.dmg` - Intel
 
             ## Installation
 

@@ -19,6 +19,9 @@ ICNS_OUTPUT="${BUILD_DIR}/iconfile.icns"
 ICNS_DARWIN_DIR="${BUILD_DIR}/darwin/iconfile.icns"
 ICNS_OUTPUT_BUNDLE="${BUILD_DIR}/bin/ProcHub.app/Contents/Resources/iconfile.icns"
 
+# Windows 图标路径
+WINDOWS_ICO="${BUILD_DIR}/windows/icon.ico"
+
 # Tray 图标路径（macOS 标准黑白模板图标）
 TRAY_ICON="${BUILD_DIR}/trayicon.png"
 
@@ -87,6 +90,32 @@ if [ -d "$(dirname "$ICNS_OUTPUT_BUNDLE")" ]; then
     cp "$ICNS_OUTPUT" "$ICNS_OUTPUT_BUNDLE"
 fi
 
+# 生成 Windows ICO 文件
+# Windows 图标需要包含多个尺寸：16, 24, 32, 48, 64, 128, 256
+echo "🪟 生成 Windows icon.ico..."
+mkdir -p "$(dirname "$WINDOWS_ICO")"
+
+# 创建临时目录存放各尺寸的 PNG
+WIN_ICONSET_DIR="${BUILD_DIR}/windows_iconset_temp"
+mkdir -p "$WIN_ICONSET_DIR"
+
+# Windows 图标标准尺寸
+declare -a WIN_SIZES=(16 24 32 48 64 128 256)
+
+for size in "${WIN_SIZES[@]}"; do
+    # Calculate inner size (72%) for padding, same as macOS
+    inner_size=$(( size * 72 / 100 ))
+    magick -background none -density 300 "$SVG_SOURCE" -resize "${inner_size}x${inner_size}" -gravity center -extent "${size}x${size}" "${WIN_ICONSET_DIR}/icon_${size}.png"
+done
+
+# 使用 ImageMagick 将多个 PNG 合并为 ICO 文件
+magick "${WIN_ICONSET_DIR}/icon_16.png" "${WIN_ICONSET_DIR}/icon_24.png" "${WIN_ICONSET_DIR}/icon_32.png" "${WIN_ICONSET_DIR}/icon_48.png" "${WIN_ICONSET_DIR}/icon_64.png" "${WIN_ICONSET_DIR}/icon_128.png" "${WIN_ICONSET_DIR}/icon_256.png" "$WINDOWS_ICO"
+
+# 清理临时目录
+rm -rf "$WIN_ICONSET_DIR"
+
+echo "   - icon.ico: $WINDOWS_ICO"
+
 # 生成 macOS Tray 图标（黑白模板图像）
 # macOS 菜单栏图标标准：
 # - 使用黑色作为前景色，透明背景
@@ -124,6 +153,7 @@ echo ""
 echo "✅ 图标生成完成!"
 echo "   - appicon.png: $APPICON_PNG"
 echo "   - iconfile.icns: $ICNS_OUTPUT"
+echo "   - icon.ico: $WINDOWS_ICO"
 echo "   - trayicon.png: $TRAY_ICON"
 if [ -f "$ICNS_OUTPUT_BUNDLE" ]; then
     echo "   - app bundle icns: $ICNS_OUTPUT_BUNDLE"
