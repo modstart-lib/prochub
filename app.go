@@ -301,7 +301,7 @@ type AnalyticsPayload struct {
 const (
 	openBaseURL      = "https://open.modstart.com"
 	analyticsURL     = openBaseURL + "/open_collect"
-	appVersion       = "v0.1.0"
+	appVersion       = "v0.2.0"
 	analyticsAppName = "ProcHub"
 )
 

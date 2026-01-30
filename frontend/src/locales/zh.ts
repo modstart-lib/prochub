@@ -1,6 +1,6 @@
 export default {
   brand: {
-    name: 'Prochub',
+    name: 'ProcHub',
     tagline: '进程调度中心',
   },
   common: {
@@ -134,6 +134,8 @@ export default {
       updateAvailable: '发现新版本',
       updateConfirm: '发现新版本 {version}，是否打开浏览器下载？',
     },
+    linkCopied: '链接已复制到剪贴板',
+    linkCopyFailed: '复制链接失败',
   },
   env: {
     title: '环境变量库',

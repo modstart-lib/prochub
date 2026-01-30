@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { Button, Card, Divider, Modal, RadioButton, RadioGroup, Select, Switch } from 'ant-design-vue';
+import { Button, Card, Divider, Modal, RadioButton, RadioGroup, Select, Switch, message } from 'ant-design-vue';
 import { Globe, Info, Languages, Moon, Power, RefreshCw, Sun } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 import { GetAutoStartEnabled, GetConfig, SetAutoStartEnabled, UpdateConfig } from '../../../wailsjs/go/main/App';
@@ -78,6 +78,16 @@ const handleCheckVersion = async () => {
     await checkVersionAndPrompt({ showLatestMessage: true, showErrorMessage: true })
   } finally {
     versionChecking.value = false
+  }
+}
+
+const copyGithubLink = async () => {
+  try {
+    await navigator.clipboard.writeText('https://github.com/modstart-lib/prochub')
+    message.success(appStore.t('settings.linkCopied'))
+  } catch (e) {
+    console.error('Failed to copy link:', e)
+    message.error(appStore.t('settings.linkCopyFailed'))
   }
 }
 </script>
@@ -210,15 +220,15 @@ const handleCheckVersion = async () => {
         <div class="about-content">
           <p class="about-text">{{ appStore.t('settings.aboutDesc') }}</p>
           <div class="about-meta">
-            <span class="version-badge">v1.0.0</span>
-            <a 
-              href="https://github.com/modstart-lib/prochub" 
-              target="_blank"
+            <span 
               class="github-link"
+              @click="copyGithubLink"
+              role="button"
+              tabindex="0"
             >
               <Globe :size="14" />
               github.com/modstart-lib/prochub
-            </a>
+            </span>
           </div>
         </div>
       </Card>
@@ -352,7 +362,7 @@ const handleCheckVersion = async () => {
 }
 
 .github-link {
-  @apply flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors;
+  @apply flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors cursor-pointer;
 }
 
 /* 主题切换按钮样式修复 */

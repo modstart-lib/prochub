@@ -4,6 +4,14 @@
 
 ProcHub 是一个跨平台的桌面进程管理应用，使用 Wails、Go 和 Vue 3 + TypeScript 构建。它提供直观的界面来管理、监控和控制 Windows、macOS 和 Linux 上的后台进程。
 
+## 截图预览
+
+![](https://ms-assets.modstart.com/data/image/2026/01/30/53657_bm0u_1352.png)
+
+![](https://ms-assets.modstart.com/data/image/2026/01/30/53670_0qf1_3093.png)
+
+![](https://ms-assets.modstart.com/data/image/2026/01/30/53689_8dao_5898.png)
+
 ## 功能特性
 
 ### 进程管理

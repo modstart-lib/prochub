@@ -4,6 +4,14 @@
 
 ProcHub is a cross-platform desktop application for process management, built with Wails, Go, and Vue 3 + TypeScript. It provides an intuitive interface to manage, monitor, and control background processes across Windows, macOS, and Linux.
 
+## Screenshot
+
+![](https://ms-assets.modstart.com/data/image/2026/01/30/53657_bm0u_1352.png)
+
+![](https://ms-assets.modstart.com/data/image/2026/01/30/53670_0qf1_3093.png)
+
+![](https://ms-assets.modstart.com/data/image/2026/01/30/53689_8dao_5898.png)
+
 ## Features
 
 ### Process Management

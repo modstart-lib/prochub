@@ -1,4 +1,4 @@
-# Makefile for Prochub Wails Application
+# Makefile for ProcHub Wails Application
 
 .PHONY: help dev build clean install check-deps
 

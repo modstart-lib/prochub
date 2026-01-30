@@ -1,6 +1,6 @@
 export default {
   brand: {
-    name: 'Prochub',
+    name: 'ProcHub',
     tagline: 'Process Control Desk',
   },
   common: {
@@ -134,6 +134,8 @@ export default {
       updateAvailable: 'Update Available',
       updateConfirm: 'New version {version} is available. Open browser to download?',
     },
+    linkCopied: 'Link copied to clipboard',
+    linkCopyFailed: 'Failed to copy link',
   },
   env: {
     title: 'Environment Vault',
