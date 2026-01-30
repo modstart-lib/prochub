@@ -1,10 +1,10 @@
 <script lang="ts" setup>
-import { Button, Card, Divider, Modal, RadioButton, RadioGroup, Select, Switch, message } from 'ant-design-vue';
+import { Button, Card, Divider, Modal, RadioButton, RadioGroup, Select, Switch } from 'ant-design-vue';
 import { Globe, Info, Languages, Moon, Power, RefreshCw, Sun } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
-import { CheckVersion, GetConfig, UpdateConfig } from '../../../wailsjs/go/main/App';
-import { main } from '../../../wailsjs/go/models';
+import { GetConfig, UpdateConfig } from '../../../wailsjs/go/main/App';
 import { trackVisit } from '../../services/analytics';
+import { checkVersionAndPrompt, currentVersion } from '../../services/version';
 import { useAppStore } from '../../stores/app';
 
 const props = defineProps<{ visible: boolean }>()
@@ -64,34 +64,11 @@ const toggleAutoStart = async (checked: boolean | string | number) => {
 
 // Version check state
 const versionChecking = ref(false)
-const versionInfo = ref<main.VersionInfo | null>(null)
-const currentVersion = 'v1.0.0'
 
 const handleCheckVersion = async () => {
   versionChecking.value = true
-  versionInfo.value = null
   try {
-    const result = await CheckVersion()
-    versionInfo.value = result
-    if (result.version === currentVersion) {
-      message.success(appStore.t('settings.version.latestVersion'))
-    } else {
-      message.info(appStore.t('settings.version.newVersion').replace('{version}', result.version))
-      if (result.url) {
-        Modal.confirm({
-          title: appStore.t('settings.version.updateAvailable'),
-          content: appStore.t('settings.version.updateConfirm').replace('{version}', result.version),
-          okText: appStore.t('common.yes'),
-          cancelText: appStore.t('common.no'),
-          onOk() {
-            window.open(result.url, '_blank')
-          },
-        })
-      }
-    }
-  } catch (e) {
-    console.error('Failed to check version:', e)
-    message.error(appStore.t('settings.version.checkFailed'))
+    await checkVersionAndPrompt({ showLatestMessage: true, showErrorMessage: true })
   } finally {
     versionChecking.value = false
   }
@@ -209,9 +186,6 @@ const handleCheckVersion = async () => {
               </template>
               {{ versionChecking ? appStore.t('settings.version.checking') : appStore.t('settings.version.checkUpdate') }}
             </Button>
-          </div>
-          <div v-if="versionInfo && versionInfo.version !== currentVersion" class="version-info">
-            <span class="new-version">{{ appStore.t('settings.version.newVersion').replace('{version}', versionInfo.version) }}</span>
           </div>
         </div>
       </div>
