@@ -17,14 +17,16 @@ jobs:
   # ==================== Linux Build ====================
   build-linux:
     name: Build Linux ${{ matrix.goarch }}
-    runs-on: ubuntu-22.04
+    runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
         include:
           - goarch: amd64
+            runner: ubuntu-22.04
             artifact_name: ProcHub-linux-amd64
             asset_name: ProcHub-linux-amd64.tar.gz
           - goarch: arm64
+            runner: ubuntu-22.04-arm
             artifact_name: ProcHub-linux-arm64
             asset_name: ProcHub-linux-arm64.tar.gz
 
@@ -57,18 +59,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev
 
-      - name: Install cross-compilation tools for arm64
-        if: matrix.goarch == 'arm64'
-        run: |
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-
       - name: Build Wails app
-        env:
-          GOOS: linux
-          GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: 1
-          CC: ${{ matrix.goarch == 'arm64' && 'aarch64-linux-gnu-gcc' || 'gcc' }}
-          CXX: ${{ matrix.goarch == 'arm64' && 'aarch64-linux-gnu-g++' || 'g++' }}
         run: |
           wails build -platform linux/${{ matrix.goarch }} -trimpath -ldflags "-s -w"
 
