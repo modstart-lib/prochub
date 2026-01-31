@@ -1,18 +1,16 @@
 <script lang="ts" setup>
 import { Button, Input, message, Spin, Switch, Tag, Tooltip } from 'ant-design-vue'
-import { Cpu, FileText, Hash, Pencil, Play, Plus, RefreshCw, RotateCw, Settings, Square } from 'lucide-vue-next'
+import { Cpu, FileText, Hash, Pencil, Play, Plus, RefreshCw, RotateCw, Square } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import type { ProcessItem } from '../../stores/app'
 import { useAppStore } from '../../stores/app'
 import AddProcessModal from '../modals/AddProcessModal.vue'
 import EditProcessModal from '../modals/EditProcessModal.vue'
 import LogsModal from '../modals/LogsModal.vue'
-import SettingsModal from '../modals/SettingsModal.vue'
 
 const appStore = useAppStore()
 const showModal = ref(false)
 const showEditModal = ref(false)
-const showSettingsModal = ref(false)
 const showLogsModal = ref(false)
 const editingProcess = ref<ProcessItem | null>(null)
 const logsProcess = ref<ProcessItem | null>(null)
@@ -55,10 +53,6 @@ const getStatusConfig = (status: string) => {
 const openEditModal = (process: ProcessItem) => {
   editingProcess.value = process
   showEditModal.value = true
-}
-
-const openSettings = () => {
-  showSettingsModal.value = true
 }
 
 const handleStart = async (process: ProcessItem) => {
@@ -118,11 +112,6 @@ const handleLogs = async (process: ProcessItem) => {
           <template #icon><Plus :size="16" /></template>
           {{ appStore.t('actions.addProcess') }}
         </Button>
-        <Tooltip :title="appStore.t('settings.title')">
-          <Button @click="openSettings">
-            <template #icon><Settings :size="16" /></template>
-          </Button>
-        </Tooltip>
       </div>
     </div>
 
@@ -224,7 +213,6 @@ const handleLogs = async (process: ProcessItem) => {
     <!-- 模态框 -->
     <AddProcessModal v-model:visible="showModal" />
     <EditProcessModal v-model:visible="showEditModal" :process="editingProcess" />
-    <SettingsModal v-model:visible="showSettingsModal" />
     <LogsModal
       v-model:visible="showLogsModal"
       :process-id="logsProcess?.id || ''"
