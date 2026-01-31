@@ -45,24 +45,22 @@ const activeTab = ref('processes')
         <!-- Left Sidebar with Vertical Tabs -->
         <div class="sidebar">
           <div class="sidebar-tabs">
-            <Tooltip :title="appStore.t('processes.title')" placement="right">
-              <button 
-                class="tab-button"
-                :class="{ active: activeTab === 'processes' }"
-                @click="activeTab = 'processes'"
-              >
-                <Cpu :size="22" />
-              </button>
-            </Tooltip>
-            <Tooltip :title="appStore.t('settings.title')" placement="right">
-              <button 
-                class="tab-button"
-                :class="{ active: activeTab === 'settings' }"
-                @click="activeTab = 'settings'"
-              >
-                <Settings :size="22" />
-              </button>
-            </Tooltip>
+            <button 
+              class="tab-button"
+              :class="{ active: activeTab === 'processes' }"
+              @click="activeTab = 'processes'"
+            >
+              <Cpu :size="20" />
+              <span class="tab-label">{{ appStore.t('processes.title') }}</span>
+            </button>
+            <button 
+              class="tab-button"
+              :class="{ active: activeTab === 'settings' }"
+              @click="activeTab = 'settings'"
+            >
+              <Settings :size="20" />
+              <span class="tab-label">{{ appStore.t('settings.title') }}</span>
+            </button>
           </div>
         </div>
 

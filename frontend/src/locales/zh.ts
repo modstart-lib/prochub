@@ -49,7 +49,7 @@ export default {
     failed: '失败停止',
   },
   processes: {
-    title: '进程列表',
+    title: '进程',
     addTitle: '新增进程',
     editTitle: '编辑进程',
     autoRestart: '失败自动重启',

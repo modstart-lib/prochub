@@ -58,15 +58,15 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  padding: 16px;
-  gap: 16px;
+  padding: 0;
+  gap: 0;
   background: transparent;
 }
 
 .app-layout {
   display: flex;
   flex-direction: row;
-  gap: 16px;
+  gap: 0;
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -75,18 +75,17 @@ body {
 .sidebar {
   display: flex;
   flex-direction: column;
-  width: 64px;
+  width: 80px;
   flex-shrink: 0;
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(226, 232, 240, 0.6);
-  border-radius: 12px;
-  padding: 12px;
+  border-right: 1px solid rgba(226, 232, 240, 0.6);
+  padding: 16px 12px;
 }
 
 .dark .sidebar {
   background: rgba(30, 41, 59, 0.8);
-  border-color: rgba(51, 65, 85, 0.6);
+  border-right-color: rgba(51, 65, 85, 0.6);
 }
 
 .sidebar-tabs {
@@ -97,19 +96,25 @@ body {
 
 .tab-button {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  padding: 0;
+  gap: 6px;
+  padding: 8px 8px;
+  width: 100%;
   border: none;
   background: transparent;
   color: #64748b;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
+}
+
+.tab-button svg {
+  flex-shrink: 0;
+  min-width: 20px;
 }
 
 .tab-button:hover {
@@ -138,6 +143,12 @@ body {
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
 }
 
+.tab-label {
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .main-content {
   flex: 1;
   min-width: 0;
@@ -145,6 +156,7 @@ body {
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
+  padding: 16px;
 }
 
 .content-view {

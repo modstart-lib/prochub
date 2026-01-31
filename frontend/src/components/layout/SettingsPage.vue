@@ -238,7 +238,7 @@ const copyGithubLink = async () => {
 }
 
 .setting-section {
-  @apply flex flex-col gap-3;
+  @apply flex flex-row items-center justify-between gap-4;
 }
 
 .section-header {
@@ -278,7 +278,7 @@ const copyGithubLink = async () => {
 }
 
 .section-control {
-  @apply mt-2;
+  @apply flex items-center;
 }
 
 .theme-button {
