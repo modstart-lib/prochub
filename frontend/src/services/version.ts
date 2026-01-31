@@ -6,6 +6,31 @@ import { useAppStore } from '../stores/app'
 // Cache for app version
 let cachedAppVersion: string | null = null
 
+/**
+ * Compare two semantic versions (e.g., "v0.2.0" vs "v0.3.0")
+ * Returns: 1 if v1 > v2, -1 if v1 < v2, 0 if equal
+ */
+function compareVersions(v1: string, v2: string): number {
+  // Remove 'v' prefix if present
+  const clean1 = v1.replace(/^v/, '')
+  const clean2 = v2.replace(/^v/, '')
+  
+  const parts1 = clean1.split('.').map(Number)
+  const parts2 = clean2.split('.').map(Number)
+  
+  const maxLength = Math.max(parts1.length, parts2.length)
+  
+  for (let i = 0; i < maxLength; i++) {
+    const num1 = parts1[i] || 0
+    const num2 = parts2[i] || 0
+    
+    if (num1 > num2) return 1
+    if (num1 < num2) return -1
+  }
+  
+  return 0
+}
+
 // Get app version from backend (cached)
 export async function getAppVersion(): Promise<string> {
   if (cachedAppVersion) {
@@ -41,7 +66,11 @@ export async function checkVersionAndPrompt(options: VersionCheckOptions = {}): 
     // Get version string, fallback to 'unknown' if empty
     const newVersion = versionInfo.version || 'unknown'
 
-    if (newVersion === currentVersion) {
+    // Compare versions: only show update if remote version is higher
+    const comparison = compareVersions(newVersion, currentVersion)
+    
+    if (comparison <= 0) {
+      // Remote version is same or lower than current version
       if (showLatestMessage) {
         message.success(appStore.t('settings.version.latestVersion'))
       }
