@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ConfigProvider, theme } from 'ant-design-vue'
+import { ConfigProvider, theme, Tooltip } from 'ant-design-vue'
 import enUS from 'ant-design-vue/es/locale/en_US'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
 import { Cpu, Settings } from 'lucide-vue-next'

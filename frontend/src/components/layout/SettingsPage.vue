@@ -222,7 +222,7 @@ const copyGithubLink = async () => {
 
 <style scoped>
 .settings-page {
-  @apply flex flex-col h-full rounded-xl border border-slate-200/60 bg-white/80 backdrop-blur-sm dark:border-slate-700/60 dark:bg-slate-800/80 p-6;
+  @apply flex flex-col rounded-xl border border-slate-200/60 bg-white/80 backdrop-blur-sm dark:border-slate-700/60 dark:bg-slate-800/80 p-6;
 }
 
 .settings-header {
@@ -234,7 +234,7 @@ const copyGithubLink = async () => {
 }
 
 .settings-content {
-  @apply flex-1 overflow-y-auto pt-6 pr-2;
+  @apply pt-6;
 }
 
 .setting-section {

@@ -223,7 +223,7 @@ const handleLogs = async (process: ProcessItem) => {
 
 <style scoped>
 .process-list-container {
-  @apply flex min-h-0 flex-1 flex-col rounded-xl border border-slate-200/60 bg-white/80 p-4 backdrop-blur-sm dark:border-slate-700/60 dark:bg-slate-800/80;
+  @apply flex flex-col rounded-xl border border-slate-200/60 bg-white/80 p-4 backdrop-blur-sm dark:border-slate-700/60 dark:bg-slate-800/80;
 }
 
 .process-header {
@@ -255,7 +255,7 @@ const handleLogs = async (process: ProcessItem) => {
 }
 
 .process-grid {
-  @apply flex-1 overflow-y-auto;
+  @apply flex flex-col;
 }
 
 .empty-state {
