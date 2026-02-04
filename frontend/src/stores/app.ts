@@ -32,14 +32,25 @@ export const useAppStore = defineStore('app', () => {
 
   const t = (key: string, params?: Record<string, unknown>) => i18n.global.t(key, params || {})
 
-  const setLocale = (nextLocale: 'zh' | 'en') => {
+  const setLocale = async (nextLocale: 'zh' | 'en') => {
     locale.value = nextLocale
     i18n.global.locale.value = nextLocale
+    // Save to backend config
+    try {
+      const config = await AppAPI.GetConfig()
+      config.locale = nextLocale
+      await AppAPI.UpdateConfig(config)
+    } catch (error) {
+      console.error('Failed to save locale setting:', error)
+    }
   }
 
-  const setTheme = (nextIsDark: boolean) => {
+  const setTheme = async (nextIsDark: boolean) => {
     isDark.value = nextIsDark
     document.documentElement.classList.toggle('dark', nextIsDark)
+    // Save theme preference to localStorage for now
+    // (backend config doesn't have a theme field yet)
+    localStorage.setItem('theme', nextIsDark ? 'dark' : 'light')
   }
 
   // Load processes from backend
@@ -176,6 +187,28 @@ export const useAppStore = defineStore('app', () => {
   const stoppedCount = computed(() => processes.value.filter((item) => item.status === 'stopped').length)
   const failedCount = computed(() => processes.value.filter((item) => item.status === 'errored').length)
 
+  // Initialize app settings from backend
+  const initSettings = async () => {
+    try {
+      const config = await AppAPI.GetConfig()
+      // Load locale from backend
+      if (config.locale) {
+        const localeValue = config.locale as 'zh' | 'en'
+        locale.value = localeValue
+        i18n.global.locale.value = localeValue
+      }
+      // Load theme from localStorage
+      const savedTheme = localStorage.getItem('theme')
+      if (savedTheme) {
+        const dark = savedTheme === 'dark'
+        isDark.value = dark
+        document.documentElement.classList.toggle('dark', dark)
+      }
+    } catch (error) {
+      console.error('Failed to load settings:', error)
+    }
+  }
+
   return {
     locale,
     isDark,
@@ -187,6 +220,7 @@ export const useAppStore = defineStore('app', () => {
     setLocale,
     setTheme,
     t,
+    initSettings,
     loadProcesses,
     addProcess,
     removeProcess,

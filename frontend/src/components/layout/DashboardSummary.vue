@@ -8,7 +8,7 @@ const appStore = useAppStore()
 <template>
   <section class="dashboard-summary">
     <div class="grid gap-4 sm:grid-cols-3">
-      <!-- 运行中 -->
+      <!-- Running -->
       <div class="stat-card stat-card-running group">
         <div class="stat-icon-wrapper stat-icon-running">
           <PlayCircle class="stat-icon" :size="24" />
@@ -24,7 +24,7 @@ const appStore = useAppStore()
         <div class="stat-indicator stat-indicator-running"></div>
       </div>
 
-      <!-- 已停止 -->
+      <!-- Stopped -->
       <div class="stat-card stat-card-stopped group">
         <div class="stat-icon-wrapper stat-icon-stopped">
           <StopCircle class="stat-icon" :size="24" />
@@ -40,7 +40,7 @@ const appStore = useAppStore()
         <div class="stat-indicator stat-indicator-stopped"></div>
       </div>
 
-      <!-- 失败 -->
+      <!-- Failed -->
       <div class="stat-card stat-card-failed group">
         <div class="stat-icon-wrapper stat-icon-failed">
           <AlertCircle class="stat-icon" :size="24" />

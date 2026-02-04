@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ConfigProvider, theme, Tooltip } from 'ant-design-vue'
+import { ConfigProvider, theme } from 'ant-design-vue'
 import enUS from 'ant-design-vue/es/locale/en_US'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
 import { Cpu, Settings } from 'lucide-vue-next'
@@ -14,7 +14,10 @@ import { useAppStore } from './stores/app'
 const appStore = useAppStore()
 
 // Track main page visit on mount
-onMounted(() => {
+onMounted(async () => {
+  // Initialize settings from backend
+  await appStore.initSettings()
+  
   trackVisit('Main')
   
   // Auto check version after 5 seconds

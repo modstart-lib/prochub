@@ -2,7 +2,7 @@
 import { Button, Card, Divider, Modal, RadioButton, RadioGroup, Select, Switch, message } from 'ant-design-vue';
 import { Globe, Info, Languages, Moon, Power, RefreshCw, Sun } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
-import { GetAutoStartEnabled, GetConfig, SetAutoStartEnabled, UpdateConfig } from '../../../wailsjs/go/main/App';
+import { GetAutoStartEnabled, SetAutoStartEnabled } from '../../../wailsjs/go/main/App';
 import { trackVisit } from '../../services/analytics';
 import { checkVersionAndPrompt, getAppVersion } from '../../services/version';
 import { useAppStore } from '../../stores/app';
@@ -102,7 +102,7 @@ const copyGithubLink = async () => {
     @cancel="emit('update:visible', false)"
   >
     <div class="settings-content">
-      <!-- 主题设置 -->
+      <!-- Theme Settings -->
       <div class="setting-section">
         <div class="section-header">
           <div class="section-icon theme-icon">
@@ -130,7 +130,7 @@ const copyGithubLink = async () => {
 
       <Divider class="section-divider" />
 
-      <!-- 语言设置 -->
+      <!-- Language Settings -->
       <div class="setting-section">
         <div class="section-header">
           <div class="section-icon language-icon">
@@ -157,7 +157,7 @@ const copyGithubLink = async () => {
 
       <Divider class="section-divider" />
 
-      <!-- 开机自动启动 -->
+      <!-- Auto-start on Boot -->
       <div class="setting-section">
         <div class="section-header">
           <div class="section-icon autostart-icon">
@@ -178,7 +178,7 @@ const copyGithubLink = async () => {
 
       <Divider class="section-divider" />
 
-      <!-- 版本检测 -->
+      <!-- Version Check -->
       <div class="setting-section">
         <div class="section-header">
           <div class="section-icon version-icon">
@@ -209,7 +209,7 @@ const copyGithubLink = async () => {
 
       <Divider class="section-divider" />
 
-      <!-- 关于 -->
+      <!-- About -->
       <Card class="about-card" :bordered="false">
         <template #title>
           <div class="about-header">
@@ -365,7 +365,7 @@ const copyGithubLink = async () => {
   @apply flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors cursor-pointer;
 }
 
-/* 主题切换按钮样式修复 */
+/* Theme toggle button style fix */
 .section-control :deep(.ant-radio-group) {
   @apply flex;
 }

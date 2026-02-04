@@ -36,3 +36,9 @@ clean:
 	rm -rf frontend/dist
 	rm -rf frontend/node_modules
 	go clean
+
+build_and_install:
+	$(MAKE) install
+	$(MAKE) build
+	sudo rm -rfv /Applications/ProcHub.app
+	sudo cp -rv build/bin/ProcHub.app /Applications/ProcHub.app

@@ -75,7 +75,7 @@ body {
 .sidebar {
   display: flex;
   flex-direction: column;
-  width: 80px;
+  width: 100px;
   flex-shrink: 0;
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(12px);

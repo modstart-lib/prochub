@@ -33,6 +33,13 @@ var trayIconWindows []byte
 var globalApp *App
 var trayManager *TrayManager
 
+// UpdateTrayLanguage updates the system tray menu language
+func UpdateTrayLanguage() {
+	if trayManager != nil {
+		trayManager.UpdateLanguage()
+	}
+}
+
 // createApplicationMenu creates the application menu with Edit menu
 // Returns nil on Windows to hide the menu bar
 func createApplicationMenu() *menu.Menu {

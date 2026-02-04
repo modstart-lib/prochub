@@ -155,6 +155,9 @@ func (a *App) RemoveProcess(id string) error {
 	// Stop the process first
 	a.pm.Stop(id)
 
+	// Unregister from process manager
+	a.pm.Unregister(id)
+
 	// Remove from config
 	newProcesses := make([]process.Definition, 0)
 	for _, p := range a.config.Processes {
@@ -230,7 +233,14 @@ func (a *App) GetConfig() config.AppConfig {
 
 // UpdateConfig updates the configuration
 func (a *App) UpdateConfig(cfg config.AppConfig) error {
+	oldLocale := a.config.Locale
 	a.config = cfg
+	
+	// Update tray language if locale changed
+	if oldLocale != cfg.Locale {
+		UpdateTrayLanguage()
+	}
+	
 	return a.store.Save(a.config)
 }
 
@@ -301,7 +311,7 @@ type AnalyticsPayload struct {
 const (
 	openBaseURL      = "https://open.modstart.com"
 	analyticsURL     = openBaseURL + "/open_collect"
-	appVersion       = "v0.3.0"
+	appVersion       = "v0.4.0"
 	analyticsAppName = "ProcHub"
 )
 

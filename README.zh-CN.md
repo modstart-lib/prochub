@@ -6,11 +6,13 @@ ProcHub 是一个跨平台的桌面进程管理应用，使用 Wails、Go 和 Vu
 
 ## 截图预览
 
-![](https://ms-assets.modstart.com/data/image/2026/01/30/53657_bm0u_1352.png)
+![](https://ms-assets.modstart.com/data/image/2026/02/04/6139_s17d_1578.png)
 
-![](https://ms-assets.modstart.com/data/image/2026/01/30/53670_0qf1_3093.png)
+![](https://ms-assets.modstart.com/data/image/2026/02/04/6163_fb7s_9127.png)
 
-![](https://ms-assets.modstart.com/data/image/2026/01/30/53689_8dao_5898.png)
+![](https://ms-assets.modstart.com/data/image/2026/02/04/6184_nlto_7268.png)
+
+![](https://ms-assets.modstart.com/data/image/2026/02/04/6211_sf2x_6063.png)
 
 ## 功能特性
 

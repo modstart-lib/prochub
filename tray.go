@@ -11,7 +11,9 @@ import (
 
 // TrayManager manages the system tray icon and menu
 type TrayManager struct {
-	app *App
+	app   *App
+	mShow *systray.MenuItem
+	mQuit *systray.MenuItem
 }
 
 // NewTrayManager creates a new TrayManager
@@ -19,6 +21,37 @@ func NewTrayManager(app *App) *TrayManager {
 	return &TrayManager{
 		app: app,
 	}
+}
+
+// getLocalizedLabels returns menu labels based on app locale setting
+func (t *TrayManager) getLocalizedLabels() (showLabel, quitLabel string) {
+	showLabel = "Show Window"
+	quitLabel = "Quit"
+
+	// Check app configuration first
+	if t.app != nil {
+		if t.app.config.Locale == "zh" {
+			showLabel = "显示界面"
+			quitLabel = "退出"
+		}
+	} else if isChineseLocale() {
+		// Fallback to system locale
+		showLabel = "显示界面"
+		quitLabel = "退出"
+	}
+
+	return showLabel, quitLabel
+}
+
+// UpdateLanguage updates the menu labels based on current locale
+func (t *TrayManager) UpdateLanguage() {
+	if t.mShow == nil || t.mQuit == nil {
+		return
+	}
+
+	showLabel, quitLabel := t.getLocalizedLabels()
+	t.mShow.SetTitle(showLabel)
+	t.mQuit.SetTitle(quitLabel)
 }
 
 // isChineseLocale checks if the system is using Chinese locale
@@ -47,27 +80,21 @@ func (t *TrayManager) onReady() {
 	}
 	systray.SetTooltip("ProcHub - Process Manager")
 
+	// Get labels based on app configuration
+	showLabel, quitLabel := t.getLocalizedLabels()
+
 	// Create menu items with localized labels
-	showLabel := "Show Window"
-	quitLabel := "Quit"
-
-	// Use Chinese labels if the system locale is Chinese
-	if isChineseLocale() {
-		showLabel = "显示界面"
-		quitLabel = "退出"
-	}
-
-	mShow := systray.AddMenuItem(showLabel, "Show the main window")
+	t.mShow = systray.AddMenuItem(showLabel, "Show the main window")
 	systray.AddSeparator()
-	mQuit := systray.AddMenuItem(quitLabel, "Quit the application")
+	t.mQuit = systray.AddMenuItem(quitLabel, "Quit the application")
 
 	// Handle menu clicks in a goroutine
 	go func() {
 		for {
 			select {
-			case <-mShow.ClickedCh:
+			case <-t.mShow.ClickedCh:
 				t.showWindow()
-			case <-mQuit.ClickedCh:
+			case <-t.mQuit.ClickedCh:
 				t.quitApp()
 				return
 			}

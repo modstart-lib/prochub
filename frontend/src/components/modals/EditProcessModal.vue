@@ -65,7 +65,7 @@ const hydrateForm = (process: ProcessItem | null) => {
     : [{ key: '', value: '' }]
 }
 
-// 选择工作目录
+// Select working directory
 const selectWorkingDir = async () => {
   try {
     const dir = await AppAPI.SelectDirectory()
@@ -77,7 +77,7 @@ const selectWorkingDir = async () => {
   }
 }
 
-// 选择命令文件
+// Select command file
 const selectCommand = async () => {
   try {
     const file = await AppAPI.SelectFile()
@@ -193,7 +193,7 @@ const restartPolicyOptions = [
           placement="topLeft"
           @confirm="handleDelete"
         >
-          <Button danger type="primary">
+          <Button danger>
             <template #icon><Trash2 :size="14" /></template>
             {{ appStore.t('actions.delete') || 'Delete' }}
           </Button>
@@ -210,7 +210,7 @@ const restartPolicyOptions = [
     </template>
 
     <Tabs v-model:activeKey="activeTab" class="modal-tabs">
-      <!-- 基础设置 -->
+      <!-- Basic Settings -->
       <TabPane key="basic">
         <template #tab>
           <span class="tab-label">
@@ -268,7 +268,7 @@ const restartPolicyOptions = [
         </Form>
       </TabPane>
 
-      <!-- 高级设置 -->
+      <!-- Advanced Settings -->
       <TabPane key="advanced">
         <template #tab>
           <span class="tab-label">
@@ -300,7 +300,7 @@ const restartPolicyOptions = [
         </Form>
       </TabPane>
 
-      <!-- 环境变量 -->
+      <!-- Environment Variables -->
       <TabPane key="env">
         <template #tab>
           <span class="tab-label">

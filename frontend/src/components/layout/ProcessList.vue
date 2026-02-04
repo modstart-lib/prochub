@@ -17,10 +17,10 @@ const logsProcess = ref<ProcessItem | null>(null)
 const searchQuery = ref('')
 const loadingProcessId = ref<string | null>(null)
 
-// 过滤并按ID排序进程列表（确保顺序固定）
+// Filter and sort process list by ID (ensure fixed order)
 const filteredProcesses = computed(() => {
   let list = [...appStore.processes]
-  // 按ID排序，确保列表顺序固定
+  // Sort by ID to ensure list order is fixed
   list.sort((a, b) => a.id.localeCompare(b.id))
   if (!searchQuery.value.trim()) {
     return list
@@ -92,7 +92,7 @@ const handleLogs = async (process: ProcessItem) => {
 
 <template>
   <section class="process-list-container">
-    <!-- 头部 -->
+    <!-- Header -->
     <div class="process-header">
       <div class="header-left">
         <h2 class="header-title">
@@ -115,7 +115,7 @@ const handleLogs = async (process: ProcessItem) => {
       </div>
     </div>
 
-    <!-- 进程列表 -->
+    <!-- Process List -->
     <div class="process-grid">
       <div v-if="filteredProcesses.length === 0" class="empty-state">
         <Cpu :size="48" class="empty-icon" />
@@ -129,7 +129,7 @@ const handleLogs = async (process: ProcessItem) => {
         :class="{ 'process-card-running': process.status === 'running' || process.status === 'starting' }"
       >
         <Spin :spinning="loadingProcessId === process.id" size="small">
-          <!-- 卡片头部 -->
+          <!-- Card Header -->
           <div class="card-header">
             <div class="card-title-section">
               <div class="status-indicator" :class="getStatusConfig(process.status).dotClass"></div>
