@@ -4,6 +4,7 @@ import enUS from 'ant-design-vue/es/locale/en_US'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
 import { Cpu, Settings } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
+import AppLogo from './components/common/AppLogo.vue'
 import DashboardSummary from './components/layout/DashboardSummary.vue'
 import ProcessList from './components/layout/ProcessList.vue'
 import SettingsPage from './components/layout/SettingsPage.vue'
@@ -17,9 +18,9 @@ const appStore = useAppStore()
 onMounted(async () => {
   // Initialize settings from backend
   await appStore.initSettings()
-  
+
   trackVisit('Main')
-  
+
   // Auto check version after 5 seconds
   autoCheckVersion(5000)
 })
@@ -47,8 +48,12 @@ const activeTab = ref('processes')
       <div class="app-layout">
         <!-- Left Sidebar with Vertical Tabs -->
         <div class="sidebar">
+          <div class="logo-area">
+            <AppLogo class="logo-image" />
+            <span class="logo-text">ProcHub</span>
+          </div>
           <div class="sidebar-tabs">
-            <button 
+            <button
               class="tab-button"
               :class="{ active: activeTab === 'processes' }"
               @click="activeTab = 'processes'"
@@ -56,7 +61,7 @@ const activeTab = ref('processes')
               <Cpu :size="20" />
               <span class="tab-label">{{ appStore.t('processes.title') }}</span>
             </button>
-            <button 
+            <button
               class="tab-button"
               :class="{ active: activeTab === 'settings' }"
               @click="activeTab = 'settings'"

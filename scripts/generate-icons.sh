@@ -9,7 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # 源 SVG 文件路径
-SVG_SOURCE="${PROJECT_ROOT}/res/processor.svg"
+SVG_SOURCE="${PROJECT_ROOT}/res/logo.svg"
 
 # 输出路径
 BUILD_DIR="${PROJECT_ROOT}/build"
