@@ -37,6 +37,7 @@ type App struct {
 	logHub       *logging.StreamHub
 	loggers      map[string]*ProcessLogger
 	autoStartMgr *service.AutoStartManager
+	systemLogger *logging.RollingStore
 }
 
 // ProcessLogger holds the logger for a specific process
@@ -68,6 +69,12 @@ func (a *App) startup(ctx context.Context) {
 	cfg, err := a.store.Load()
 	if err != nil {
 		cfg = config.DefaultConfig()
+		// Initialize system logger first before logging errors
+		homeDir, _ := os.UserHomeDir()
+		systemLogDir := filepath.Join(homeDir, ".prochub", "system_logs")
+		os.MkdirAll(systemLogDir, 0755)
+		a.systemLogger = logging.NewRollingStore(systemLogDir, 1000, 10)
+		a.LogSystemError("startup", fmt.Sprintf("Failed to load config, using default: %v", err))
 	}
 	a.config = cfg
 
@@ -78,7 +85,10 @@ func (a *App) startup(ctx context.Context) {
 	homeDir, _ := os.UserHomeDir()
 	logDir := filepath.Join(homeDir, ".prochub", a.config.LogDir)
 	os.MkdirAll(logDir, 0755)
-
+	// Initialize system logger
+	systemLogDir := filepath.Join(homeDir, ".prochub", "system_logs")
+	os.MkdirAll(systemLogDir, 0755)
+	a.systemLogger = logging.NewRollingStore(systemLogDir, 1000, 10)
 	// Set up log callback for process manager
 	a.pm.SetLogCallback(func(processID, stream, line string) {
 		logger, ok := a.loggers[processID]
@@ -115,6 +125,9 @@ func (a *App) startup(ctx context.Context) {
 			go a.pm.Start(ctx, def.ID)
 		}
 	}
+
+	// Log successful startup
+	a.LogSystemError("startup", fmt.Sprintf("Application started successfully, version: %s, platform: %s", appConfig.Version, a.autoStartMgr.GetPlatform()))
 }
 
 // Greet returns a greeting for the given name
@@ -147,13 +160,20 @@ func (a *App) AddProcess(def process.Definition) error {
 
 	// Add to config and save
 	a.config.Processes = append(a.config.Processes, def)
-	return a.store.Save(a.config)
+	err := a.store.Save(a.config)
+	if err != nil {
+		a.LogSystemError("AddProcess", fmt.Sprintf("Failed to save config after adding process %s: %v", def.Name, err))
+	}
+	return err
 }
 
 // RemoveProcess removes a process by ID
 func (a *App) RemoveProcess(id string) error {
 	// Stop the process first
-	a.pm.Stop(id)
+	err := a.pm.Stop(id)
+	if err != nil {
+		a.LogSystemError("RemoveProcess", fmt.Sprintf("Failed to stop process %s: %v", id, err))
+	}
 
 	// Unregister from process manager
 	a.pm.Unregister(id)
@@ -170,13 +190,20 @@ func (a *App) RemoveProcess(id string) error {
 	// Remove logger
 	delete(a.loggers, id)
 
-	return a.store.Save(a.config)
+	err = a.store.Save(a.config)
+	if err != nil {
+		a.LogSystemError("RemoveProcess", fmt.Sprintf("Failed to save config after removing process %s: %v", id, err))
+	}
+	return err
 }
 
 // UpdateProcess updates a process configuration
 func (a *App) UpdateProcess(id string, def process.Definition) error {
 	// Stop the process first
-	a.pm.Stop(id)
+	err := a.pm.Stop(id)
+	if err != nil {
+		a.LogSystemError("UpdateProcess", fmt.Sprintf("Failed to stop process %s: %v", id, err))
+	}
 
 	// Update in config
 	for i, p := range a.config.Processes {
@@ -191,25 +218,42 @@ func (a *App) UpdateProcess(id string, def process.Definition) error {
 	a.pm.Register(def)
 
 	// Save config
-	return a.store.Save(a.config)
+	err = a.store.Save(a.config)
+	if err != nil {
+		a.LogSystemError("UpdateProcess", fmt.Sprintf("Failed to save config after updating process %s: %v", id, err))
+	}
+	return err
 }
 
 // StartProcess starts a process by ID
 func (a *App) StartProcess(id string) error {
-	return a.pm.Start(a.ctx, id)
+	err := a.pm.Start(a.ctx, id)
+	if err != nil {
+		a.LogSystemError("StartProcess", fmt.Sprintf("Failed to start process %s: %v", id, err))
+	}
+	return err
 }
 
 // StopProcess stops a process by ID
 func (a *App) StopProcess(id string) error {
-	return a.pm.Stop(id)
+	err := a.pm.Stop(id)
+	if err != nil {
+		a.LogSystemError("StopProcess", fmt.Sprintf("Failed to stop process %s: %v", id, err))
+	}
+	return err
 }
 
 // RestartProcess restarts a process by ID
 func (a *App) RestartProcess(id string) error {
 	if err := a.pm.Stop(id); err != nil {
+		a.LogSystemError("RestartProcess", fmt.Sprintf("Failed to stop process %s during restart: %v", id, err))
 		return err
 	}
-	return a.pm.Start(a.ctx, id)
+	err := a.pm.Start(a.ctx, id)
+	if err != nil {
+		a.LogSystemError("RestartProcess", fmt.Sprintf("Failed to start process %s during restart: %v", id, err))
+	}
+	return err
 }
 
 // ListProcesses returns all processes with their status
@@ -290,6 +334,113 @@ func (a *App) GetPlatform() string {
 // GetAppVersion returns the current app version
 func (a *App) GetAppVersion() string {
 	return appConfig.Version
+}
+
+// GetSystemVersion returns detailed system version information
+func (a *App) GetSystemVersion() map[string]string {
+	info := make(map[string]string)
+	info["os"] = goruntime.GOOS
+	info["arch"] = goruntime.GOARCH
+	info["platform"] = a.autoStartMgr.GetPlatform()
+	
+	// Get OS version based on platform
+	var cmd *exec.Cmd
+	switch goruntime.GOOS {
+	case "darwin":
+		cmd = exec.Command("sw_vers", "-productVersion")
+	case "linux":
+		cmd = exec.Command("lsb_release", "-ds")
+		// Fallback to /etc/os-release if lsb_release not available
+		if _, err := exec.LookPath("lsb_release"); err != nil {
+			cmd = exec.Command("sh", "-c", "cat /etc/os-release | grep PRETTY_NAME | cut -d'=' -f2 | tr -d '\"'")
+		}
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "ver")
+	}
+	
+	if cmd != nil {
+		if output, err := cmd.Output(); err == nil {
+			info["osVersion"] = strings.TrimSpace(string(output))
+		} else {
+			info["osVersion"] = "unknown"
+		}
+	}
+	
+	// Get hostname
+	if hostname, err := os.Hostname(); err == nil {
+		info["hostname"] = hostname
+	}
+	
+	info["goVersion"] = goruntime.Version()
+	info["numCPU"] = fmt.Sprintf("%d", goruntime.NumCPU())
+	
+	return info
+}
+
+// LogSystemError logs system errors to the system log file
+func (a *App) LogSystemError(component, message string) {
+	if a.systemLogger == nil {
+		return
+	}
+	entry := logging.Entry{
+		Timestamp: time.Now(),
+		Stream:    component,
+		Line:      message,
+	}
+	a.systemLogger.Append(entry)
+}
+
+// GetSystemLogs returns system logs from the last 24 hours
+func (a *App) GetSystemLogs() (string, error) {
+	var logs strings.Builder
+	
+	// Collect application system logs
+	homeDir, _ := os.UserHomeDir()
+	systemLogDir := filepath.Join(homeDir, ".prochub", "system_logs")
+	
+	logs.WriteString("=== Application System Logs ===\n")
+	if entries, err := os.ReadDir(systemLogDir); err == nil {
+		now := time.Now()
+		yesterday := now.Add(-24 * time.Hour)
+		
+		totalSize := 0
+		maxSize := 500 * 1024 // Limit to 500KB of logs
+		
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			
+			info, err := entry.Info()
+			if err != nil {
+				continue
+			}
+			
+			// Only include logs from last 24 hours
+			if info.ModTime().After(yesterday) {
+				filePath := filepath.Join(systemLogDir, entry.Name())
+				content, err := os.ReadFile(filePath)
+				if err == nil {
+					if totalSize+len(content) > maxSize {
+						logs.WriteString(fmt.Sprintf("\n... (remaining logs truncated, limit %dKB reached)\n", maxSize/1024))
+						break
+					}
+					logs.WriteString(fmt.Sprintf("\n--- %s ---\n", entry.Name()))
+					logs.Write(content)
+					logs.WriteString("\n")
+					totalSize += len(content)
+				}
+			}
+		}
+		
+		if totalSize == 0 {
+			logs.WriteString("No system logs found in the last 24 hours\n")
+		}
+	} else {
+		logs.WriteString(fmt.Sprintf("Unable to read system logs directory: %v\n", err))
+	}
+	
+	return logs.String(), nil
 }
 
 // GetAppConfig returns application configuration
@@ -609,6 +760,12 @@ func (a *App) CheckVersion() (VersionInfo, error) {
 
 // shutdown is called when the app is closing
 func (a *App) shutdown(ctx context.Context) {
+	// Log shutdown
+	a.LogSystemError("shutdown", "Application is shutting down")
+	
 	// Stop all running processes gracefully
 	a.pm.StopAll()
+	
+	// Final log
+	a.LogSystemError("shutdown", "Application shutdown complete")
 }
