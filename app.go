@@ -331,6 +331,11 @@ func (a *App) GetPlatform() string {
 	return a.autoStartMgr.GetPlatform()
 }
 
+// GetAppName returns the application display name
+func (a *App) GetAppName() string {
+	return AppDisplayName
+}
+
 // GetAppVersion returns the current app version
 func (a *App) GetAppVersion() string {
 	return appConfig.Version

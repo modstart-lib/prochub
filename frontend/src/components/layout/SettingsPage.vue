@@ -2,7 +2,7 @@
 import { Button, Card, Divider, message, Modal, RadioButton, RadioGroup, Select, Switch } from 'ant-design-vue';
 import { Globe, Info, Languages, MessageSquare, Moon, Power, RefreshCw, Sun } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { GetAppConfig, GetAutoStartEnabled, GetPlatform, GetProcessLogs, GetSystemLogs, GetSystemVersion, ListProcesses, SetAutoStartEnabled } from '../../../wailsjs/go/main/App';
+import { GetAppConfig, GetAppName, GetAutoStartEnabled, GetPlatform, GetProcessLogs, GetSystemLogs, GetSystemVersion, ListProcesses, SetAutoStartEnabled } from '../../../wailsjs/go/main/App';
 import { trackVisit } from '../../services/analytics';
 import { checkVersionAndPrompt, getAppVersion } from '../../services/version';
 import { useAppStore } from '../../stores/app';
@@ -97,12 +97,14 @@ const handleFeedbackMessage = async (event: MessageEvent) => {
 
   if (type === 'FeedbackTicket:env') {
     try {
+      const name = await GetAppName()
       const version = await getAppVersion()
       const processes = await ListProcesses()
       const platform = await GetPlatform()
       const systemVersion = await GetSystemVersion()
       
       const envData = {
+        name,
         version,
         platform,
         systemVersion,
