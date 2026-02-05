@@ -289,7 +289,26 @@ func (a *App) GetPlatform() string {
 
 // GetAppVersion returns the current app version
 func (a *App) GetAppVersion() string {
-	return appVersion
+	return appConfig.Version
+}
+
+// GetAppConfig returns application configuration
+func (a *App) GetAppConfig() map[string]interface{} {
+	return map[string]interface{}{
+		"name":            appConfig.Name,
+		"title":           appConfig.Title,
+		"slogan":          appConfig.Slogan,
+		"version":         appConfig.Version,
+		"website":         appConfig.Website,
+		"websiteGithub":   appConfig.WebsiteGithub,
+		"websiteGitee":    appConfig.WebsiteGitee,
+		"apiBaseUrl":      appConfig.ApiBaseUrl,
+		"analyticsUrl":    appConfig.AnalyticsUrl,
+		"versionCheckUrl": appConfig.VersionCheckUrl,
+		"feedbackUrl":     appConfig.FeedbackUrl,
+		"guideUrl":        appConfig.GuideUrl,
+		"helpUrl":         appConfig.HelpUrl,
+	}
 }
 
 // GetProcess returns a single process by ID
@@ -308,12 +327,38 @@ type AnalyticsPayload struct {
 	Data []AnalyticsEvent `json:"data"`
 }
 
-const (
-	openBaseURL      = "https://open.modstart.com"
-	analyticsURL     = openBaseURL + "/open_collect"
-	appVersion       = "v0.4.0"
-	analyticsAppName = "ProcHub"
-)
+const baseURL = "https://open.modstart.com/open_app/ProcHub"
+
+// AppConfig holds application-wide configuration
+var appConfig = struct {
+	Name        string
+	Title       string
+	Slogan      string
+	Version     string
+	Website     string
+	WebsiteGithub string
+	WebsiteGitee  string
+	ApiBaseUrl    string
+	AnalyticsUrl  string
+	VersionCheckUrl string
+	FeedbackUrl   string
+	GuideUrl      string
+	HelpUrl       string
+}{
+	Name:            "ProcHub",
+	Title:           "ProcHub",
+	Slogan:          "Manage processes easily",
+	Version:         "v0.5.0",
+	Website:         baseURL,
+	WebsiteGithub:   "https://github.com/modstart-lib/prochub",
+	WebsiteGitee:    "https://gitee.com/modstart-lib/prochub",
+	ApiBaseUrl:      baseURL + "/api",
+	AnalyticsUrl:    baseURL + "/app_manager/collect",
+	VersionCheckUrl: baseURL + "/app_manager/updater",
+	FeedbackUrl:     baseURL + "/feedback_ticket",
+	GuideUrl:        baseURL + "/app_manager/guide",
+	HelpUrl:         baseURL + "/app_manager/help",
+}
 
 // getDeviceUUID returns a persistent UUID for this device
 func (a *App) getDeviceUUID() string {
@@ -336,11 +381,11 @@ func (a *App) getDeviceUUID() string {
 func getPlatform() string {
 	switch goruntime.GOOS {
 	case "darwin":
-		return "macOS"
+		return "mac"
 	case "windows":
-		return "Windows"
+		return "win"
 	case "linux":
-		return "Linux"
+		return "linux"
 	default:
 		return goruntime.GOOS
 	}
@@ -402,25 +447,35 @@ func (a *App) SendAnalytics(events []AnalyticsEvent) {
 	go func() {
 		client := &http.Client{Timeout: 10 * time.Second}
 
-		// Build User-Agent: Open/{AppName}/{Version}/{Platform}/{PlatformArch}/{PlatformVersion}/{UUID}
-		userAgent := fmt.Sprintf("Open/%s/%s/%s/%s/%s/%s",
-			analyticsAppName,
-			appVersion,
+		// Build User-Agent: AppOpen/{AppName}/{Version} Platform/{PlatformName}/{PlatformArch}/{PlatformVersion}/{UUID}
+		userAgent := fmt.Sprintf("AppOpen/%s/%s Platform/%s/%s/%s/%s",
+			appConfig.Name,
+			appConfig.Version,
 			getPlatform(),
 			getPlatformArch(),
 			getPlatformVersion(),
 			a.getDeviceUUID(),
 		)
 
-		// Build payload with data array
-		payload := AnalyticsPayload{Data: events}
-		jsonData, err := json.Marshal(payload)
+		// Build form data
+		formData := map[string]interface{}{
+			"uuid":    a.getDeviceUUID(),
+			"version": appConfig.Version,
+			"data":    events,
+			"platform": map[string]string{
+				"name":    getPlatform(),
+				"arch":    getPlatformArch(),
+				"version": getPlatformVersion(),
+			},
+		}
+
+		jsonData, err := json.Marshal(formData)
 		if err != nil {
 			fmt.Printf("[Analytics] Failed to marshal payload: %v\n", err)
 			return
 		}
 
-		req, err := http.NewRequest("POST", analyticsURL, bytes.NewBuffer(jsonData))
+		req, err := http.NewRequest("POST", appConfig.AnalyticsUrl, bytes.NewBuffer(jsonData))
 		if err != nil {
 			fmt.Printf("[Analytics] Failed to create request: %v\n", err)
 			return
@@ -492,21 +547,43 @@ type versionCheckResponse struct {
 	Data VersionInfo `json:"data"`
 }
 
-const versionCheckURL = openBaseURL + "/open_version/check"
-
 // CheckVersion checks for new version from the server
 func (a *App) CheckVersion() (VersionInfo, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 
-	// Build form data
-	formData := "name=ProcHub"
+	// Build User-Agent: AppOpen/{AppName}/{Version} Platform/{PlatformName}/{PlatformArch}/{PlatformVersion}/{UUID}
+	userAgent := fmt.Sprintf("AppOpen/%s/%s Platform/%s/%s/%s/%s",
+		appConfig.Name,
+		appConfig.Version,
+		getPlatform(),
+		getPlatformArch(),
+		getPlatformVersion(),
+		a.getDeviceUUID(),
+	)
 
-	req, err := http.NewRequest("POST", versionCheckURL, strings.NewReader(formData))
+	// Build form data
+	formData := map[string]interface{}{
+		"uuid":    a.getDeviceUUID(),
+		"version": appConfig.Version,
+		"platform": map[string]string{
+			"name":    getPlatform(),
+			"arch":    getPlatformArch(),
+			"version": getPlatformVersion(),
+		},
+	}
+
+	jsonData, err := json.Marshal(formData)
+	if err != nil {
+		return VersionInfo{}, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", appConfig.VersionCheckUrl, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return VersionInfo{}, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", userAgent)
 
 	resp, err := client.Do(req)
 	if err != nil {
