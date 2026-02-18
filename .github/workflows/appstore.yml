@@ -25,7 +25,7 @@ jobs:
 
       - name: Extract version from app.go
         run: |
-          VERSION=$(grep -oP '(?<=Version:\s+"v)[^"]+' app.go)
+          VERSION=$(sed -n 's/.*Version:[[:space:]]*"v\([^"]*\)".*/\1/p' app.go | head -1)
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
           echo "Version: $VERSION"
 
