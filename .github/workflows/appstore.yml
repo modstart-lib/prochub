@@ -199,10 +199,15 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_ID: ${{ secrets.APPLE_APP_ID }}
         run: |
           echo "Uploading ${{ env.PKG_NAME }} to App Store Connect..."
           xcrun altool --upload-package "${{ env.PKG_NAME }}" \
             --type macos \
+            --apple-id "$APPLE_APP_ID" \
+            --bundle-id "${{ env.BUNDLE_ID }}" \
+            --bundle-version "${{ env.BUILD_NUMBER }}" \
+            --bundle-short-version-string "${{ env.APP_VERSION }}" \
             --username "$APPLE_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --asc-provider "$APPLE_TEAM_ID" \
