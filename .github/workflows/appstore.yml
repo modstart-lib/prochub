@@ -98,7 +98,7 @@ jobs:
           # Resolve signing identities
           DIST_IDENTITY=$(security find-identity -v -p codesigning $KEYCHAIN_PATH \
             | grep "Apple Distribution" | head -1 | awk -F'"' '{print $2}')
-          INSTALLER_IDENTITY=$(security find-identity -v $KEYCHAIN_PATH \
+          INSTALLER_IDENTITY=$(security find-identity -v -p basic $KEYCHAIN_PATH \
             | grep "Mac Installer Distribution" | head -1 | awk -F'"' '{print $2}')
 
           echo "DIST_IDENTITY=$DIST_IDENTITY"         >> $GITHUB_ENV
@@ -165,7 +165,13 @@ jobs:
           PKG_NAME="${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ matrix.goarch }}.pkg"
           APP_PATH="build/bin/${{ env.APP_NAME }}.app"
 
-          # Build unsigned pkg first, then sign in next step
+          if [ -z "$INSTALLER_IDENTITY" ]; then
+            echo "ERROR: INSTALLER_IDENTITY is empty. Check that CORP_MACOS_INSTALLER_CERTIFICATE is set correctly."
+            security find-identity -v -p basic $RUNNER_TEMP/app-signing.keychain-db || true
+            exit 1
+          fi
+          echo "Using installer identity: $INSTALLER_IDENTITY"
+
           productbuild \
             --component "$APP_PATH" /Applications \
             --sign "$INSTALLER_IDENTITY" \
