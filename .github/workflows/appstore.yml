@@ -131,31 +131,29 @@ jobs:
       - name: Sign app bundle
         run: |
           APP_PATH="build/bin/${{ env.APP_NAME }}.app"
+          ENTITLEMENTS="build/darwin/entitlements.plist"
 
-          # Sign embedded dylibs / frameworks first (deep)
+          # Sign embedded dylibs / frameworks first
           find "$APP_PATH" \( -name "*.dylib" -o -name "*.framework" \) | while read lib; do
             codesign --force --options runtime --sign "$DIST_IDENTITY" "$lib" || true
           done
 
-          # Sign main binary (with entitlements if present)
-          ENTITLEMENTS="build/darwin/entitlements.plist"
+          # Sign the full bundle with entitlements (App Store requires app-sandbox)
+          # --deep ensures nested binaries are signed; entitlements are applied to the bundle
           if [ -f "$ENTITLEMENTS" ]; then
-            codesign --force --options runtime \
+            codesign --force --deep --options runtime \
               --entitlements "$ENTITLEMENTS" \
               --sign "$DIST_IDENTITY" \
-              "$APP_PATH/Contents/MacOS/${{ env.APP_NAME }}"
+              "$APP_PATH"
           else
-            codesign --force --options runtime \
+            codesign --force --deep --options runtime \
               --sign "$DIST_IDENTITY" \
-              "$APP_PATH/Contents/MacOS/${{ env.APP_NAME }}"
+              "$APP_PATH"
           fi
 
-          # Sign the full bundle (deep)
-          codesign --force --deep --options runtime \
-            --sign "$DIST_IDENTITY" \
-            "$APP_PATH"
-
           codesign --verify --verbose=4 "$APP_PATH"
+          # Confirm sandbox entitlement is present
+          codesign -d --entitlements - "$APP_PATH/Contents/MacOS/${{ env.APP_NAME }}" | grep app-sandbox
           echo "App bundle signed"
 
       # ------------------------------------------------------------------ #
