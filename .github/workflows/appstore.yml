@@ -8,7 +8,7 @@ env:
   NODE_VERSION: '20'
   APP_NAME: 'ProcHub'
   BUNDLE_ID: 'prochub'
-  APPLE_APP_ID: 'com.modstart.prochub'
+  APPLE_APP_ID: '6759326945'
 
 jobs:
   appstore:
