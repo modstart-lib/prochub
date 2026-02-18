@@ -15,8 +15,9 @@ jobs:
     name: Build & Upload to App Store Connect (${{ matrix.goarch }})
     runs-on: macos-latest
     strategy:
+      max-parallel: 1
       matrix:
-        goarch: [arm64, amd64]
+        goarch: [amd64, arm64]
 
     steps:
       - name: Checkout code
@@ -36,7 +37,14 @@ jobs:
           MAJOR=$(echo "$VER" | cut -d. -f1)
           MINOR=$(echo "$VER" | cut -d. -f2)
           PATCH=$(echo "$VER" | cut -d. -f3)
-          BUILD_NUMBER=$(printf "%02d%02d%02d" "$MAJOR" "$MINOR" "$PATCH")
+          BASE=$(printf "%02d%02d%02d" "$MAJOR" "$MINOR" "$PATCH")
+          # amd64 uploads first (01), arm64 uploads second (02)
+          if [ "${{ matrix.goarch }}" = "amd64" ]; then
+            ARCH_SUFFIX="01"
+          else
+            ARCH_SUFFIX="02"
+          fi
+          BUILD_NUMBER="${BASE}${ARCH_SUFFIX}"
           echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
           echo "Build number: $BUILD_NUMBER"
 
