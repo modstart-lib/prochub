@@ -7,8 +7,8 @@ env:
   GO_VERSION: '1.24'
   NODE_VERSION: '20'
   APP_NAME: 'ProcHub'
-  BUNDLE_ID: 'prochub'
-  APPLE_APP_ID: '6759326945'
+  BUNDLE_ID: 'com.modstart.prochub'
+  APPLE_APP_ID: '6759332899'
 
 jobs:
   appstore:
