@@ -189,36 +189,7 @@ jobs:
           echo "PKG signature verified"
 
       # ------------------------------------------------------------------ #
-      # 7. Notarize the PKG (Apple malware scan)
-      #
-      # Required secrets:
-      #   APPLE_ID                  – Apple ID email
-      #   APPLE_APP_SPECIFIC_PASSWORD – app-specific password
-      #   APPLE_TEAM_ID             – Team ID
-      # ------------------------------------------------------------------ #
-      - name: Notarize PKG
-        env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          echo "Submitting ${{ env.PKG_NAME }} to Apple Notary Service..."
-          xcrun notarytool submit "${{ env.PKG_NAME }}" \
-            --apple-id "$APPLE_ID" \
-            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
-            --team-id "$APPLE_TEAM_ID" \
-            --wait \
-            --timeout 30m
-          echo "Notarization complete"
-
-      - name: Staple notarization ticket
-        run: |
-          xcrun stapler staple "${{ env.PKG_NAME }}"
-          xcrun stapler validate "${{ env.PKG_NAME }}"
-          echo "Notarization ticket stapled"
-
-      # ------------------------------------------------------------------ #
-      # 8. Upload PKG to App Store Connect (TestFlight / App Review)
+      # 7. Upload PKG to App Store Connect (TestFlight / App Review)
       #
       # Uses xcrun altool (available without extra install).
       # Alternatively set USE_NOTARYTOOL=true to use notarytool upload.
