@@ -63,7 +63,7 @@ jobs:
       # Required secrets:
       #   CORP_MACOS_DIST_CERTIFICATE          – "Apple Distribution" cert (base64 p12)
       #   CORP_MACOS_DIST_CERTIFICATE_PASSWORD – p12 password
-      #   CORP_MACOS_INSTALLER_CERTIFICATE          – "Mac Installer Distribution" cert (base64 p12)
+      #   CORP_MACOS_INSTALLER_CERTIFICATE          – "3rd Party Mac Developer Installer" cert (base64 p12)
       #   CORP_MACOS_INSTALLER_CERTIFICATE_PASSWORD – p12 password
       # ------------------------------------------------------------------ #
       - name: Import signing certificates
@@ -99,7 +99,7 @@ jobs:
           DIST_IDENTITY=$(security find-identity -v -p codesigning $KEYCHAIN_PATH \
             | grep "Apple Distribution" | head -1 | awk -F'"' '{print $2}')
           INSTALLER_IDENTITY=$(security find-identity -v -p basic $KEYCHAIN_PATH \
-            | grep "Mac Installer Distribution" | head -1 | awk -F'"' '{print $2}')
+            | grep -E "Mac Installer Distribution|3rd Party Mac Developer Installer" | head -1 | awk -F'"' '{print $2}')
 
           echo "DIST_IDENTITY=$DIST_IDENTITY"         >> $GITHUB_ENV
           echo "INSTALLER_IDENTITY=$INSTALLER_IDENTITY" >> $GITHUB_ENV
