@@ -1,0 +1,243 @@
+name: App Store Release
+
+on:
+  workflow_dispatch:
+
+env:
+  GO_VERSION: '1.24'
+  NODE_VERSION: '20'
+  APP_NAME: 'ProcHub'
+  BUNDLE_ID: 'prochub'
+
+jobs:
+  appstore:
+    name: Build & Upload to App Store Connect (${{ matrix.goarch }})
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        goarch: [arm64, amd64]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from app.go
+        run: |
+          VERSION=$(grep -oP '(?<=Version:\s+"v)[^"]+' app.go)
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Version: $VERSION"
+
+      - name: Compute build number
+        run: |
+          VER="${{ env.APP_VERSION }}"
+          MAJOR=$(echo "$VER" | cut -d. -f1)
+          MINOR=$(echo "$VER" | cut -d. -f2)
+          PATCH=$(echo "$VER" | cut -d. -f3)
+          BUILD_NUMBER=$(printf "%02d%02d%02d" "$MAJOR" "$MINOR" "$PATCH")
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
+          echo "Build number: $BUILD_NUMBER"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm install
+
+      # ------------------------------------------------------------------ #
+      # 1. Import certificates into a temporary keychain
+      #
+      # Required secrets:
+      #   CORP_MACOS_DIST_CERTIFICATE          – "Apple Distribution" cert (base64 p12)
+      #   CORP_MACOS_DIST_CERTIFICATE_PASSWORD – p12 password
+      #   CORP_MACOS_INSTALLER_CERTIFICATE          – "Mac Installer Distribution" cert (base64 p12)
+      #   CORP_MACOS_INSTALLER_CERTIFICATE_PASSWORD – p12 password
+      # ------------------------------------------------------------------ #
+      - name: Import signing certificates
+        env:
+          CORP_MACOS_DIST_CERTIFICATE: ${{ secrets.CORP_MACOS_DIST_CERTIFICATE }}
+          CORP_MACOS_DIST_CERTIFICATE_PASSWORD: ${{ secrets.CORP_MACOS_DIST_CERTIFICATE_PASSWORD }}
+          CORP_MACOS_INSTALLER_CERTIFICATE: ${{ secrets.CORP_MACOS_INSTALLER_CERTIFICATE }}
+          CORP_MACOS_INSTALLER_CERTIFICATE_PASSWORD: ${{ secrets.CORP_MACOS_INSTALLER_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # Import Apple Distribution cert
+          echo "$CORP_MACOS_DIST_CERTIFICATE" | base64 --decode > $RUNNER_TEMP/dist.p12
+          security import $RUNNER_TEMP/dist.p12 \
+            -P "$CORP_MACOS_DIST_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+
+          # Import Mac Installer Distribution cert
+          echo "$CORP_MACOS_INSTALLER_CERTIFICATE" | base64 --decode > $RUNNER_TEMP/installer.p12
+          security import $RUNNER_TEMP/installer.p12 \
+            -P "$CORP_MACOS_INSTALLER_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+          # Resolve signing identities
+          DIST_IDENTITY=$(security find-identity -v -p codesigning $KEYCHAIN_PATH \
+            | grep "Apple Distribution" | head -1 | awk -F'"' '{print $2}')
+          INSTALLER_IDENTITY=$(security find-identity -v $KEYCHAIN_PATH \
+            | grep "Mac Installer Distribution" | head -1 | awk -F'"' '{print $2}')
+
+          echo "DIST_IDENTITY=$DIST_IDENTITY"         >> $GITHUB_ENV
+          echo "INSTALLER_IDENTITY=$INSTALLER_IDENTITY" >> $GITHUB_ENV
+          echo "App signing identity    : $DIST_IDENTITY"
+          echo "Installer signing identity: $INSTALLER_IDENTITY"
+
+      # ------------------------------------------------------------------ #
+      # 2. Build with Wails
+      # ------------------------------------------------------------------ #
+      - name: Build app
+        run: |
+          wails build -platform darwin/${{ matrix.goarch }} -trimpath -ldflags "-s -w"
+
+      # ------------------------------------------------------------------ #
+      # 3. Inject version & build number into Info.plist
+      # ------------------------------------------------------------------ #
+      - name: Set version in Info.plist
+        run: |
+          PLIST="build/bin/${{ env.APP_NAME }}.app/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ env.APP_VERSION }}" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ env.BUILD_NUMBER }}"         "$PLIST"
+          echo "Version set to ${{ env.APP_VERSION }} (${{ env.BUILD_NUMBER }})"
+
+      # ------------------------------------------------------------------ #
+      # 4. Sign the .app with Apple Distribution certificate
+      #    (hardened runtime + entitlements required for App Store)
+      # ------------------------------------------------------------------ #
+      - name: Sign app bundle
+        run: |
+          APP_PATH="build/bin/${{ env.APP_NAME }}.app"
+
+          # Sign embedded dylibs / frameworks first (deep)
+          find "$APP_PATH" \( -name "*.dylib" -o -name "*.framework" \) | while read lib; do
+            codesign --force --options runtime --sign "$DIST_IDENTITY" "$lib" || true
+          done
+
+          # Sign main binary (with entitlements if present)
+          ENTITLEMENTS="build/darwin/entitlements.plist"
+          if [ -f "$ENTITLEMENTS" ]; then
+            codesign --force --options runtime \
+              --entitlements "$ENTITLEMENTS" \
+              --sign "$DIST_IDENTITY" \
+              "$APP_PATH/Contents/MacOS/${{ env.APP_NAME }}"
+          else
+            codesign --force --options runtime \
+              --sign "$DIST_IDENTITY" \
+              "$APP_PATH/Contents/MacOS/${{ env.APP_NAME }}"
+          fi
+
+          # Sign the full bundle (deep)
+          codesign --force --deep --options runtime \
+            --sign "$DIST_IDENTITY" \
+            "$APP_PATH"
+
+          codesign --verify --verbose=4 "$APP_PATH"
+          echo "App bundle signed"
+
+      # ------------------------------------------------------------------ #
+      # 5. Package into .pkg with productbuild
+      # ------------------------------------------------------------------ #
+      - name: Create PKG installer
+        run: |
+          PKG_NAME="${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ matrix.goarch }}.pkg"
+          APP_PATH="build/bin/${{ env.APP_NAME }}.app"
+
+          # Build unsigned pkg first, then sign in next step
+          productbuild \
+            --component "$APP_PATH" /Applications \
+            --sign "$INSTALLER_IDENTITY" \
+            "$PKG_NAME"
+
+          echo "PKG_NAME=$PKG_NAME" >> $GITHUB_ENV
+          echo "PKG created: $PKG_NAME"
+
+      # ------------------------------------------------------------------ #
+      # 6. Verify PKG signature
+      # ------------------------------------------------------------------ #
+      - name: Verify PKG signature
+        run: |
+          pkgutil --check-signature "${{ env.PKG_NAME }}"
+          echo "PKG signature verified"
+
+      # ------------------------------------------------------------------ #
+      # 7. Notarize the PKG (Apple malware scan)
+      #
+      # Required secrets:
+      #   APPLE_ID                  – Apple ID email
+      #   APPLE_APP_SPECIFIC_PASSWORD – app-specific password
+      #   APPLE_TEAM_ID             – Team ID
+      # ------------------------------------------------------------------ #
+      - name: Notarize PKG
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          echo "Submitting ${{ env.PKG_NAME }} to Apple Notary Service..."
+          xcrun notarytool submit "${{ env.PKG_NAME }}" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait \
+            --timeout 30m
+          echo "Notarization complete"
+
+      - name: Staple notarization ticket
+        run: |
+          xcrun stapler staple "${{ env.PKG_NAME }}"
+          xcrun stapler validate "${{ env.PKG_NAME }}"
+          echo "Notarization ticket stapled"
+
+      # ------------------------------------------------------------------ #
+      # 8. Upload PKG to App Store Connect (TestFlight / App Review)
+      #
+      # Uses xcrun altool (available without extra install).
+      # Alternatively set USE_NOTARYTOOL=true to use notarytool upload.
+      # ------------------------------------------------------------------ #
+      - name: Upload to App Store Connect
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          echo "Uploading ${{ env.PKG_NAME }} to App Store Connect..."
+          xcrun altool --upload-package "${{ env.PKG_NAME }}" \
+            --type macos \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --asc-provider "$APPLE_TEAM_ID" \
+            --verbose
+          echo "Upload complete — check App Store Connect for processing status"
+
+      # ------------------------------------------------------------------ #
+      # 9. Save PKG as workflow artifact (optional backup)
+      # ------------------------------------------------------------------ #
+      - name: Upload PKG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-appstore-${{ matrix.goarch }}-${{ env.APP_VERSION }}
+          path: ${{ env.PKG_NAME }}
+          retention-days: 14
