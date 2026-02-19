@@ -90,7 +90,8 @@ jobs:
             -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
 
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security list-keychain -d user -s $KEYCHAIN_PATH
+          # Prepend temp keychain while keeping system/login keychains in the chain
+          security list-keychain -d user -s $KEYCHAIN_PATH $(security list-keychains -d user | tr -d '" ')
 
           # Resolve signing identities
           DIST_IDENTITY=$(security find-identity -v -p codesigning $KEYCHAIN_PATH \
@@ -98,10 +99,17 @@ jobs:
           INSTALLER_IDENTITY=$(security find-identity -v -p basic $KEYCHAIN_PATH \
             | grep -E "Mac Installer Distribution|3rd Party Mac Developer Installer" | head -1 | awk -F'"' '{print $2}')
 
+          # Extract SHA-1 of the Apple Distribution cert for later validation
+          DIST_CERT_SHA1=$(security find-identity -v -p codesigning $KEYCHAIN_PATH \
+            | grep "Apple Distribution" | head -1 | awk '{print $2}')
+
           echo "DIST_IDENTITY=$DIST_IDENTITY"         >> $GITHUB_ENV
           echo "INSTALLER_IDENTITY=$INSTALLER_IDENTITY" >> $GITHUB_ENV
+          echo "DIST_CERT_SHA1=$DIST_CERT_SHA1"         >> $GITHUB_ENV
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH"           >> $GITHUB_ENV
           echo "App signing identity    : $DIST_IDENTITY"
           echo "Installer signing identity: $INSTALLER_IDENTITY"
+          echo "App Distribution cert SHA-1: $DIST_CERT_SHA1"
 
       # ------------------------------------------------------------------ #
       # 2. Build with Wails
@@ -153,6 +161,7 @@ jobs:
             while read lib; do
               codesign --force --options runtime \
                 --entitlements "$ENTITLEMENTS" \
+                --keychain "$KEYCHAIN_PATH" \
                 --sign "$DIST_IDENTITY" "$lib" || true
             done
 
@@ -162,12 +171,14 @@ jobs:
             while read bin; do
               codesign --force --options runtime \
                 --entitlements "$ENTITLEMENTS" \
+                --keychain "$KEYCHAIN_PATH" \
                 --sign "$DIST_IDENTITY" "$bin" || true
             done
 
           # 3. Sign the main app bundle last (covers everything not yet signed)
           codesign --force --options runtime \
             --entitlements "$ENTITLEMENTS" \
+            --keychain "$KEYCHAIN_PATH" \
             --sign "$DIST_IDENTITY" \
             "$APP_PATH"
 
@@ -179,6 +190,61 @@ jobs:
           # Confirm sandbox entitlement
           codesign -d --entitlements - "$APP_PATH/Contents/MacOS/${{ env.APP_NAME }}" | grep app-sandbox
           echo "App bundle signed and provisioning profile verified"
+
+      # ------------------------------------------------------------------ #
+      # 5a. Validate: cert in keychain must match cert in provisioning profile
+      #     Catches "Missing code-signing certificate" BEFORE uploading.
+      # ------------------------------------------------------------------ #
+      - name: Validate cert matches provisioning profile
+        run: |
+          APP_PATH="build/bin/${{ env.APP_NAME }}.app"
+          PROFILE="$APP_PATH/Contents/embedded.provisionprofile"
+
+          echo "--- Signing cert SHA-1 from keychain ---"
+          echo "$DIST_CERT_SHA1"
+
+          # Decode the provisioning profile CMS envelope
+          security cms -D -i "$PROFILE" > /tmp/decoded_profile.plist
+
+          echo "--- Certificates listed in provisioning profile ---"
+          # Extract each DeveloperCertificates entry as a PEM and print its fingerprint
+          COUNT=$(plutil -extract DeveloperCertificates raw /tmp/decoded_profile.plist 2>/dev/null || echo 0)
+          python3 - <<'EOF'
+import plistlib, hashlib, sys
+with open('/tmp/decoded_profile.plist', 'rb') as f:
+    p = plistlib.load(f)
+certs = p.get('DeveloperCertificates', [])
+if not certs:
+    print('ERROR: No DeveloperCertificates found in provisioning profile', file=sys.stderr)
+    sys.exit(1)
+for c in certs:
+    data = bytes(c) if isinstance(c, bytes) else c.data
+    sha1 = hashlib.sha1(data).hexdigest().upper()
+    print(f'  Profile cert SHA-1: {sha1}')
+EOF
+
+          echo "--- Checking if signing cert is in the profile ---"
+          python3 - <<EOF
+import plistlib, hashlib, os, sys
+with open('/tmp/decoded_profile.plist', 'rb') as f:
+    p = plistlib.load(f)
+certs = p.get('DeveloperCertificates', [])
+profile_sha1s = set()
+for c in certs:
+    data = bytes(c) if isinstance(c, bytes) else c.data
+    profile_sha1s.add(hashlib.sha1(data).hexdigest().upper())
+signing_sha1 = os.environ.get('DIST_CERT_SHA1', '').upper()
+if not signing_sha1:
+    print('ERROR: DIST_CERT_SHA1 env var is empty', file=sys.stderr)
+    sys.exit(1)
+if signing_sha1 not in profile_sha1s:
+    print(f'ERROR: Signing cert {signing_sha1} is NOT present in the provisioning profile.', file=sys.stderr)
+    print('Fix: regenerate the provisioning profile in the Apple Developer Portal', file=sys.stderr)
+    print('     to include the Apple Distribution certificate, then update the CORP_MACOS_PROVISION_PROFILE secret.', file=sys.stderr)
+    sys.exit(1)
+print(f'OK: Signing cert {signing_sha1} is present in the provisioning profile.')
+EOF
+          echo "Cert/profile validation passed"
 
       # ------------------------------------------------------------------ #
       # 6. Package into .pkg with productbuild
