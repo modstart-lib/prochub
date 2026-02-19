@@ -59,10 +59,11 @@ jobs:
       # 1. Import certificates into a temporary keychain
       #
       # Required secrets:
-      #   CORP_MACOS_DIST_CERTIFICATE          – "Apple Distribution" cert (base64 p12)
-      #   CORP_MACOS_DIST_CERTIFICATE_PASSWORD – p12 password
-      #   CORP_MACOS_INSTALLER_CERTIFICATE          – "3rd Party Mac Developer Installer" cert (base64 p12)
+      #   CORP_MACOS_DIST_CERTIFICATE              – "Apple Distribution" cert (base64 p12)
+      #   CORP_MACOS_DIST_CERTIFICATE_PASSWORD     – p12 password
+      #   CORP_MACOS_INSTALLER_CERTIFICATE         – "3rd Party Mac Developer Installer" cert (base64 p12)
       #   CORP_MACOS_INSTALLER_CERTIFICATE_PASSWORD – p12 password
+      #   CORP_MACOS_PROVISION_PROFILE             – Mac App Distribution provisioning profile (base64)
       # ------------------------------------------------------------------ #
       - name: Import signing certificates
         env:
@@ -122,39 +123,67 @@ jobs:
           echo "Version set to ${{ env.APP_VERSION }} (${{ env.BUILD_NUMBER }})"
 
       # ------------------------------------------------------------------ #
-      # 4. Sign the .app with Apple Distribution certificate
-      #    (hardened runtime + entitlements required for App Store)
+      # 4. Embed provisioning profile
+      #    Required to pass TestFlight validation (ITMS-90889).
+      #    Must happen BEFORE codesign so the profile is included in the
+      #    code signature. --deep would strip it, so we sign inside-out.
+      # ------------------------------------------------------------------ #
+      - name: Embed provisioning profile
+        env:
+          CORP_MACOS_PROVISION_PROFILE: ${{ secrets.CORP_MACOS_PROVISION_PROFILE }}
+        run: |
+          APP_PATH="build/bin/${{ env.APP_NAME }}.app"
+          echo "$CORP_MACOS_PROVISION_PROFILE" | base64 --decode \
+            > "$APP_PATH/Contents/embedded.provisionprofile"
+          echo "Provisioning profile embedded:"
+          ls -lh "$APP_PATH/Contents/embedded.provisionprofile"
+
+      # ------------------------------------------------------------------ #
+      # 5. Sign the .app with Apple Distribution certificate
+      #    Inside-out order (frameworks → helpers → bundle) is required.
+      #    Do NOT use --deep: it re-signs nested content and can invalidate
+      #    the embedded provisioning profile.
       # ------------------------------------------------------------------ #
       - name: Sign app bundle
         run: |
           APP_PATH="build/bin/${{ env.APP_NAME }}.app"
           ENTITLEMENTS="build/darwin/entitlements.plist"
 
-          # Sign embedded dylibs / frameworks first
-          find "$APP_PATH" \( -name "*.dylib" -o -name "*.framework" \) | while read lib; do
-            codesign --force --options runtime --sign "$DIST_IDENTITY" "$lib" || true
-          done
+          # 1. Sign nested frameworks
+          find "$APP_PATH/Contents/Frameworks" \
+            \( -name "*.framework" -o -name "*.dylib" \) 2>/dev/null | \
+            while read lib; do
+              codesign --force --options runtime \
+                --entitlements "$ENTITLEMENTS" \
+                --sign "$DIST_IDENTITY" "$lib" || true
+            done
 
-          # Sign the full bundle with entitlements (App Store requires app-sandbox)
-          # --deep ensures nested binaries are signed; entitlements are applied to the bundle
-          if [ -f "$ENTITLEMENTS" ]; then
-            codesign --force --deep --options runtime \
-              --entitlements "$ENTITLEMENTS" \
-              --sign "$DIST_IDENTITY" \
-              "$APP_PATH"
-          else
-            codesign --force --deep --options runtime \
-              --sign "$DIST_IDENTITY" \
-              "$APP_PATH"
-          fi
+          # 2. Sign helper binaries (everything in MacOS/ except the main executable)
+          find "$APP_PATH/Contents/MacOS" -type f \
+            ! -name "${{ env.APP_NAME }}" 2>/dev/null | \
+            while read bin; do
+              codesign --force --options runtime \
+                --entitlements "$ENTITLEMENTS" \
+                --sign "$DIST_IDENTITY" "$bin" || true
+            done
 
-          codesign --verify --verbose=4 "$APP_PATH"
-          # Confirm sandbox entitlement is present
+          # 3. Sign the main app bundle last (covers everything not yet signed)
+          codesign --force --options runtime \
+            --entitlements "$ENTITLEMENTS" \
+            --sign "$DIST_IDENTITY" \
+            "$APP_PATH"
+
+          # Verify
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          # Assert profile is still present after signing
+          test -f "$APP_PATH/Contents/embedded.provisionprofile" || \
+            { echo "ERROR: embedded.provisionprofile missing after codesign!"; exit 1; }
+          # Confirm sandbox entitlement
           codesign -d --entitlements - "$APP_PATH/Contents/MacOS/${{ env.APP_NAME }}" | grep app-sandbox
-          echo "App bundle signed"
+          echo "App bundle signed and provisioning profile verified"
 
       # ------------------------------------------------------------------ #
-      # 5. Package into .pkg with productbuild
+      # 6. Package into .pkg with productbuild
       # ------------------------------------------------------------------ #
       - name: Create PKG installer
         run: |
@@ -177,7 +206,7 @@ jobs:
           echo "PKG created: $PKG_NAME"
 
       # ------------------------------------------------------------------ #
-      # 6. Verify PKG signature
+      # 7. Verify PKG signature
       # ------------------------------------------------------------------ #
       - name: Verify PKG signature
         run: |
@@ -185,7 +214,7 @@ jobs:
           echo "PKG signature verified"
 
       # ------------------------------------------------------------------ #
-      # 7. Upload PKG to App Store Connect (TestFlight / App Review)
+      # 8. Upload PKG to App Store Connect (TestFlight / App Review)
       #
       # Uses xcrun altool (available without extra install).
       # Alternatively set USE_NOTARYTOOL=true to use notarytool upload.
@@ -212,6 +241,7 @@ jobs:
       # ------------------------------------------------------------------ #
       # 9. Save PKG as workflow artifact (optional backup)
       # ------------------------------------------------------------------ #
+
       - name: Upload PKG artifact
         uses: actions/upload-artifact@v4
         with:

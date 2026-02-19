@@ -1,14 +1,16 @@
 # Makefile for ProcHub Wails Application
 
 # App Store / TestFlight signing config
-BUNDLE_ID       = com.modstart.prochub
-APP_NAME        = ProcHub
-APP_PATH        = build/bin/$(APP_NAME).app
-PROVISION_PROFILE ?= $(HOME)/Library/MobileDevice/Provisioning\ Profiles/$(APP_NAME)_AppStore.provisionprofile
-# Codesign identity: "3rd Party Mac Developer Application: Your Name (TEAMID)"
-SIGN_IDENTITY   ?= "3rd Party Mac Developer Application"
+BUNDLE_ID            = com.modstart.prochub
+APP_NAME             = ProcHub
+APP_PATH             = build/bin/$(APP_NAME).app
+PROVISION_PROFILE   ?= $(HOME)/Library/MobileDevice/Provisioning\ Profiles/$(APP_NAME)_AppStore.provisionprofile
+# Application signing identity: "3rd Party Mac Developer Application: Your Name (TEAMID)"
+SIGN_IDENTITY        ?= "3rd Party Mac Developer Application"
+# Installer signing identity: "3rd Party Mac Developer Installer: Your Name (TEAMID)"
+INSTALLER_IDENTITY   ?= "3rd Party Mac Developer Installer"
 
-.PHONY: help dev build clean install check-deps appstore sign-appstore
+.PHONY: help dev build clean install check-deps
 
 # Default target
 help:
@@ -50,27 +52,3 @@ build_and_install:
 	$(MAKE) build
 	sudo rm -rfv /Applications/ProcHub.app
 	sudo cp -rv build/bin/ProcHub.app /Applications/ProcHub.app
-
-# Build and sign for App Store / TestFlight submission
-# Usage:
-#   make appstore SIGN_IDENTITY="3rd Party Mac Developer Application: Your Name (TEAMID)" \
-#                 PROVISION_PROFILE=/path/to/ProcHub_AppStore.provisionprofile
-appstore: check-deps
-	wails build -platform darwin/universal
-	$(MAKE) sign-appstore
-
-sign-appstore:
-	@echo "Embedding provisioning profile..."
-	cp "$(PROVISION_PROFILE)" "$(APP_PATH)/Contents/embedded.provisionprofile"
-	@echo "Re-signing bundle with entitlements..."
-	codesign --force --deep --sign $(SIGN_IDENTITY) \
-		--entitlements build/darwin/entitlements.plist \
-		--options runtime \
-		"$(APP_PATH)"
-	@echo "Verifying signature..."
-	codesign --verify --deep --strict --verbose=2 "$(APP_PATH)"
-	@echo "Packaging for App Store (pkg)..."
-	productbuild --component "$(APP_PATH)" /Applications \
-		--sign "3rd Party Mac Developer Installer" \
-		build/bin/$(APP_NAME).pkg
-	@echo "Done: build/bin/$(APP_NAME).pkg is ready for upload via altool or Transporter."
