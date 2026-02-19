@@ -196,6 +196,38 @@ jobs:
       #     Catches "Missing code-signing certificate" BEFORE uploading.
       # ------------------------------------------------------------------ #
       - name: Validate cert matches provisioning profile
+        env:
+          PY_LIST_CERTS: |
+            import plistlib, hashlib, sys
+            with open('/tmp/decoded_profile.plist', 'rb') as f:
+                p = plistlib.load(f)
+            certs = p.get('DeveloperCertificates', [])
+            if not certs:
+                print('ERROR: No DeveloperCertificates found in provisioning profile', file=sys.stderr)
+                sys.exit(1)
+            for c in certs:
+                data = bytes(c) if isinstance(c, bytes) else c.data
+                sha1 = hashlib.sha1(data).hexdigest().upper()
+                print(f'  Profile cert SHA-1: {sha1}')
+          PY_CHECK_CERT: |
+            import plistlib, hashlib, os, sys
+            with open('/tmp/decoded_profile.plist', 'rb') as f:
+                p = plistlib.load(f)
+            certs = p.get('DeveloperCertificates', [])
+            profile_sha1s = set()
+            for c in certs:
+                data = bytes(c) if isinstance(c, bytes) else c.data
+                profile_sha1s.add(hashlib.sha1(data).hexdigest().upper())
+            signing_sha1 = os.environ.get('DIST_CERT_SHA1', '').upper()
+            if not signing_sha1:
+                print('ERROR: DIST_CERT_SHA1 env var is empty', file=sys.stderr)
+                sys.exit(1)
+            if signing_sha1 not in profile_sha1s:
+                print(f'ERROR: Signing cert {signing_sha1} is NOT present in the provisioning profile.', file=sys.stderr)
+                print('Fix: regenerate the provisioning profile in the Apple Developer Portal', file=sys.stderr)
+                print('     to include the Apple Distribution certificate, then update the CORP_MACOS_PROVISION_PROFILE secret.', file=sys.stderr)
+                sys.exit(1)
+            print(f'OK: Signing cert {signing_sha1} is present in the provisioning profile.')
         run: |
           APP_PATH="build/bin/${{ env.APP_NAME }}.app"
           PROFILE="$APP_PATH/Contents/embedded.provisionprofile"
@@ -207,43 +239,11 @@ jobs:
           security cms -D -i "$PROFILE" > /tmp/decoded_profile.plist
 
           echo "--- Certificates listed in provisioning profile ---"
-          # Extract each DeveloperCertificates entry as a PEM and print its fingerprint
-          COUNT=$(plutil -extract DeveloperCertificates raw /tmp/decoded_profile.plist 2>/dev/null || echo 0)
-          python3 - <<'EOF'
-import plistlib, hashlib, sys
-with open('/tmp/decoded_profile.plist', 'rb') as f:
-    p = plistlib.load(f)
-certs = p.get('DeveloperCertificates', [])
-if not certs:
-    print('ERROR: No DeveloperCertificates found in provisioning profile', file=sys.stderr)
-    sys.exit(1)
-for c in certs:
-    data = bytes(c) if isinstance(c, bytes) else c.data
-    sha1 = hashlib.sha1(data).hexdigest().upper()
-    print(f'  Profile cert SHA-1: {sha1}')
-EOF
+          echo "$PY_LIST_CERTS" | python3
 
           echo "--- Checking if signing cert is in the profile ---"
-          python3 - <<EOF
-import plistlib, hashlib, os, sys
-with open('/tmp/decoded_profile.plist', 'rb') as f:
-    p = plistlib.load(f)
-certs = p.get('DeveloperCertificates', [])
-profile_sha1s = set()
-for c in certs:
-    data = bytes(c) if isinstance(c, bytes) else c.data
-    profile_sha1s.add(hashlib.sha1(data).hexdigest().upper())
-signing_sha1 = os.environ.get('DIST_CERT_SHA1', '').upper()
-if not signing_sha1:
-    print('ERROR: DIST_CERT_SHA1 env var is empty', file=sys.stderr)
-    sys.exit(1)
-if signing_sha1 not in profile_sha1s:
-    print(f'ERROR: Signing cert {signing_sha1} is NOT present in the provisioning profile.', file=sys.stderr)
-    print('Fix: regenerate the provisioning profile in the Apple Developer Portal', file=sys.stderr)
-    print('     to include the Apple Distribution certificate, then update the CORP_MACOS_PROVISION_PROFILE secret.', file=sys.stderr)
-    sys.exit(1)
-print(f'OK: Signing cert {signing_sha1} is present in the provisioning profile.')
-EOF
+          echo "$PY_CHECK_CERT" | python3
+
           echo "Cert/profile validation passed"
 
       # ------------------------------------------------------------------ #
