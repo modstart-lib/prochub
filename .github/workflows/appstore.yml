@@ -7,8 +7,6 @@ env:
   GO_VERSION: '1.24'
   NODE_VERSION: '20'
   APP_NAME: 'ProcHub'
-  BUNDLE_ID: 'com.modstart.prochub'
-  APPLE_APP_ID: '6759332899'
 
 jobs:
   appstore:
@@ -224,6 +222,8 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          BUNDLE_ID: ${{ secrets.BUNDLE_ID }}
+          APPLE_APP_ID: ${{ secrets.APPLE_APP_ID }}
         run: |
           echo "Uploading ${{ env.PKG_NAME }} to App Store Connect..."
           xcrun altool --upload-package "${{ env.PKG_NAME }}" \
