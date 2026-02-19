@@ -12,7 +12,7 @@ env:
 
 jobs:
   appstore:
-    name: Build & Upload to App Store Connect (universal)
+    name: Build & Upload to App Store Connect
     runs-on: macos-latest
 
     steps:
