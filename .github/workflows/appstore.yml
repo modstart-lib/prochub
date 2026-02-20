@@ -164,8 +164,20 @@ jobs:
           /usr/libexec/PlistBuddy -x \
             -c "Print :Entitlements" /tmp/decoded_profile.plist \
             > /tmp/profile_entitlements.plist
-          echo "--- Entitlements from provisioning profile ---"
-          cat /tmp/profile_entitlements.plist
+          
+          # Merge the profile entitlements with our app's entitlements (sandbox, network, etc.)
+          python3 -c "
+import plistlib
+with open('$ENTITLEMENTS', 'rb') as f:
+    app_ent = plistlib.load(f)
+with open('/tmp/profile_entitlements.plist', 'rb') as f:
+    prof_ent = plistlib.load(f)
+app_ent.update(prof_ent)
+with open('/tmp/merged_entitlements.plist', 'wb') as f:
+    plistlib.dump(app_ent, f)
+"
+          echo "--- Merged Entitlements ---"
+          cat /tmp/merged_entitlements.plist
 
           # Resolve the bundle identifier from Info.plist
           APP_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" \
@@ -192,11 +204,11 @@ jobs:
                 --sign "$DIST_IDENTITY" "$bin" || true
             done
 
-          # 3. Sign the main app bundle last using the profile's own entitlements.
+          # 3. Sign the main app bundle last using the merged entitlements.
           #    This ensures com.apple.application-identifier is signed into the
-          #    bundle, which TestFlight requires (ITMS-90886).
+          #    bundle, which TestFlight requires (ITMS-90886), while keeping sandbox.
           codesign --force --options runtime \
-            --entitlements /tmp/profile_entitlements.plist \
+            --entitlements /tmp/merged_entitlements.plist \
             --keychain "$KEYCHAIN_PATH" \
             --identifier "$APP_BUNDLE_ID" \
             --sign "$DIST_IDENTITY" \
