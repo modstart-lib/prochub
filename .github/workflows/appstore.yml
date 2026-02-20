@@ -154,8 +154,25 @@ jobs:
         run: |
           APP_PATH="build/bin/${{ env.APP_NAME }}.app"
           ENTITLEMENTS="build/darwin/entitlements.plist"
+          PROFILE="$APP_PATH/Contents/embedded.provisionprofile"
 
-          # 1. Sign nested frameworks
+          # Extract the entitlements embedded in the provisioning profile.
+          # These contain com.apple.application-identifier (TEAMID.bundleid) and
+          # com.apple.developer.team-identifier which MUST be present in the signed
+          # binary for TestFlight to accept it (ITMS-90886).
+          security cms -D -i "$PROFILE" > /tmp/decoded_profile.plist
+          /usr/libexec/PlistBuddy -x \
+            -c "Print :Entitlements" /tmp/decoded_profile.plist \
+            > /tmp/profile_entitlements.plist
+          echo "--- Entitlements from provisioning profile ---"
+          cat /tmp/profile_entitlements.plist
+
+          # Resolve the bundle identifier from Info.plist
+          APP_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" \
+            "$APP_PATH/Contents/Info.plist")
+          echo "Bundle identifier: $APP_BUNDLE_ID"
+
+          # 1. Sign nested frameworks (basic entitlements are fine here)
           find "$APP_PATH/Contents/Frameworks" \
             \( -name "*.framework" -o -name "*.dylib" \) 2>/dev/null | \
             while read lib; do
@@ -175,15 +192,11 @@ jobs:
                 --sign "$DIST_IDENTITY" "$bin" || true
             done
 
-          # 3. Sign the main app bundle last (covers everything not yet signed)
-          #    --identifier must match CFBundleIdentifier in Info.plist and the
-          #    provisioning profile's application-identifier; omitting it causes
-          #    ITMS-90886 ("missing an application identifier") on TestFlight.
-          APP_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" \
-            "$APP_PATH/Contents/Info.plist")
-          echo "Bundle identifier: $APP_BUNDLE_ID"
+          # 3. Sign the main app bundle last using the profile's own entitlements.
+          #    This ensures com.apple.application-identifier is signed into the
+          #    bundle, which TestFlight requires (ITMS-90886).
           codesign --force --options runtime \
-            --entitlements "$ENTITLEMENTS" \
+            --entitlements /tmp/profile_entitlements.plist \
             --keychain "$KEYCHAIN_PATH" \
             --identifier "$APP_BUNDLE_ID" \
             --sign "$DIST_IDENTITY" \
