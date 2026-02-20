@@ -175,7 +175,7 @@ with open('/tmp/profile_entitlements.plist', 'rb') as f:
 app_ent.update(prof_ent)
 with open('/tmp/merged_entitlements.plist', 'wb') as f:
     plistlib.dump(app_ent, f)
-"
+          "
           echo "--- Merged Entitlements ---"
           cat /tmp/merged_entitlements.plist
 
