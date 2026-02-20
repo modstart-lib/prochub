@@ -166,16 +166,31 @@ jobs:
             > /tmp/profile_entitlements.plist
           
           # Merge the profile entitlements with our app's entitlements (sandbox, network, etc.)
-          python3 -c "
-import plistlib
-with open('$ENTITLEMENTS', 'rb') as f:
-    app_ent = plistlib.load(f)
-with open('/tmp/profile_entitlements.plist', 'rb') as f:
-    prof_ent = plistlib.load(f)
-app_ent.update(prof_ent)
-with open('/tmp/merged_entitlements.plist', 'wb') as f:
-    plistlib.dump(app_ent, f)
-          "
+          # Extract the two required keys from the profile and inject them into a copy
+          # of our entitlements file, so sandbox/network entitlements are preserved.
+          cp "$ENTITLEMENTS" /tmp/merged_entitlements.plist
+
+          APP_ID=$(/usr/libexec/PlistBuddy \
+            -c "Print :Entitlements:com.apple.application-identifier" \
+            /tmp/decoded_profile.plist)
+          TEAM_ID=$(/usr/libexec/PlistBuddy \
+            -c "Print :Entitlements:com.apple.developer.team-identifier" \
+            /tmp/decoded_profile.plist)
+
+          /usr/libexec/PlistBuddy \
+            -c "Add :com.apple.application-identifier string $APP_ID" \
+            /tmp/merged_entitlements.plist 2>/dev/null || \
+          /usr/libexec/PlistBuddy \
+            -c "Set :com.apple.application-identifier $APP_ID" \
+            /tmp/merged_entitlements.plist
+
+          /usr/libexec/PlistBuddy \
+            -c "Add :com.apple.developer.team-identifier string $TEAM_ID" \
+            /tmp/merged_entitlements.plist 2>/dev/null || \
+          /usr/libexec/PlistBuddy \
+            -c "Set :com.apple.developer.team-identifier $TEAM_ID" \
+            /tmp/merged_entitlements.plist
+
           echo "--- Merged Entitlements ---"
           cat /tmp/merged_entitlements.plist
 
