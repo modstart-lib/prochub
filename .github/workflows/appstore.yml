@@ -176,9 +176,16 @@ jobs:
             done
 
           # 3. Sign the main app bundle last (covers everything not yet signed)
+          #    --identifier must match CFBundleIdentifier in Info.plist and the
+          #    provisioning profile's application-identifier; omitting it causes
+          #    ITMS-90886 ("missing an application identifier") on TestFlight.
+          APP_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" \
+            "$APP_PATH/Contents/Info.plist")
+          echo "Bundle identifier: $APP_BUNDLE_ID"
           codesign --force --options runtime \
             --entitlements "$ENTITLEMENTS" \
             --keychain "$KEYCHAIN_PATH" \
+            --identifier "$APP_BUNDLE_ID" \
             --sign "$DIST_IDENTITY" \
             "$APP_PATH"
 
