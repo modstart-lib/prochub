@@ -130,9 +130,20 @@ func (t *TrayManager) quitApp() {
 	systray.Quit()
 }
 
-// Run starts the systray - should be called in a goroutine
+// Run starts the systray.
+// We use RunWithExternalLoop instead of Run so that fyne.io/systray does NOT
+// call [NSApp run] / nativeLoop on macOS. Wails already owns the macOS main
+// event loop; calling it a second time from a goroutine causes the
+// "nextEventMatchingMask should only be called from the Main Thread" panic
+// that freezes all AppKit dialogs (NSOpenPanel, NSSavePanel, etc.).
+//
+// The start() function returned by RunWithExternalLoop creates NSStatusBarWindow
+// on macOS, which must be called on the main thread. runTrayStart() handles this
+// platform-specifically: on Darwin it uses dispatch_async(main_queue), on other
+// platforms it calls start() directly.
 func (t *TrayManager) Run() {
-	systray.Run(t.onReady, t.onExit)
+	start, _ := systray.RunWithExternalLoop(t.onReady, t.onExit)
+	runTrayStart(start)
 }
 
 // Quit stops the systray
