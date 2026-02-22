@@ -303,9 +303,6 @@ func (a *App) SelectDirectory() (string, error) {
 func (a *App) SelectFile() (string, error) {
 	file, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
 		Title: "Select Command/Executable",
-		Filters: []runtime.FileFilter{
-			{DisplayName: "All Files", Pattern: "*.*"},
-		},
 	})
 	if err != nil {
 		return "", err
