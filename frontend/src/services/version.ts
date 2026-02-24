@@ -3,6 +3,12 @@ import { CheckVersion, GetAppVersion } from '../../wailsjs/go/main/App'
 import { BrowserOpenURL } from '../../wailsjs/runtime/runtime'
 import { useAppStore } from '../stores/app'
 
+/**
+ * True when the app is built for App Store distribution (VITE_APPSTORE_BUILD=true).
+ * Version check UI and auto-check are disabled in this build.
+ */
+export const isAppStoreBuild = import.meta.env.VITE_APPSTORE_BUILD === 'true'
+
 // Cache for app version
 let cachedAppVersion: string | null = null
 

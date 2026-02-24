@@ -9,7 +9,7 @@ import DashboardSummary from './components/layout/DashboardSummary.vue'
 import ProcessList from './components/layout/ProcessList.vue'
 import SettingsPage from './components/layout/SettingsPage.vue'
 import { trackVisit } from './services/analytics'
-import { autoCheckVersion } from './services/version'
+import { autoCheckVersion, isAppStoreBuild } from './services/version'
 import { useAppStore } from './stores/app'
 
 const appStore = useAppStore()
@@ -21,8 +21,10 @@ onMounted(async () => {
 
   trackVisit('Main')
 
-  // Auto check version after 5 seconds
-  autoCheckVersion(5000)
+  // Auto check version after 5 seconds (disabled in App Store builds)
+  if (!isAppStoreBuild) {
+    autoCheckVersion(5000)
+  }
 })
 
 const antLocale = computed(() => {

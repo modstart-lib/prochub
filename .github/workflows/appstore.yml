@@ -115,6 +115,8 @@ jobs:
       # 2. Build with Wails
       # ------------------------------------------------------------------ #
       - name: Build app
+        env:
+          VITE_APPSTORE_BUILD: 'true'
         run: |
           wails build -platform darwin/universal -trimpath -ldflags "-s -w"
 

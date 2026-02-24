@@ -4,7 +4,7 @@ import { Globe, Info, Languages, MessageSquare, Moon, Power, RefreshCw, Sun } fr
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { GetAppConfig, GetAppName, GetAutoStartEnabled, GetPlatform, GetProcessLogs, GetSystemLogs, GetSystemVersion, ListProcesses, SetAutoStartEnabled } from '../../../wailsjs/go/main/App';
 import { trackVisit } from '../../services/analytics';
-import { checkVersionAndPrompt, getAppVersion } from '../../services/version';
+import { checkVersionAndPrompt, getAppVersion, isAppStoreBuild } from '../../services/version';
 import { useAppStore } from '../../stores/app';
 
 const appStore = useAppStore()
@@ -256,10 +256,10 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <Divider class="section-divider" />
+      <Divider v-if="!isAppStoreBuild" class="section-divider" />
 
       <!-- 版本检测 -->
-      <div class="setting-section">
+      <div v-if="!isAppStoreBuild" class="setting-section">
         <div class="section-header">
           <div class="section-icon version-icon">
             <RefreshCw :size="18" />
