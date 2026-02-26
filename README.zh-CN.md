@@ -68,6 +68,31 @@ wails build
 # 构建的应用程序将在 build/bin 目录中
 ```
 
+## 💬 交流沟通
+
+> 添加好友时备注 "ProcHub"
+
+<table width="100%">
+    <thead>
+        <tr>
+            <th width="50%">WeChat Group</th>
+            <th>QQ Group</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <img style="width:100%;"
+                     src="https://modstart.com/code_dynamic/modstart_wx" />
+            </td>
+            <td>
+                <img style="width:100%;"
+                     src="https://modstart.com/code_dynamic/modstart_qq" />
+            </td>
+        </tr>
+    </tbody>
+</table>
+
 ## 许可证
 
 本项目采用 [Apache 2.0 许可证](LICENSE)。

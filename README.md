@@ -68,6 +68,32 @@ wails build
 # The built application will be in build/bin directory
 ```
 
+
+## 💬 Join the Community
+
+> Add friend with note "ProcHub"
+
+<table width="100%">
+    <thead>
+        <tr>
+            <th width="50%">WeChat Group</th>
+            <th>QQ Group</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+                <img style="width:100%;"
+                     src="https://modstart.com/code_dynamic/modstart_wx" />
+            </td>
+            <td>
+                <img style="width:100%;"
+                     src="https://modstart.com/code_dynamic/modstart_qq" />
+            </td>
+        </tr>
+    </tbody>
+</table>
+
 ## License
 
 This project is licensed under the [Apache 2.0 License](LICENSE).
