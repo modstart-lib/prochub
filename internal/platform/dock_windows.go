@@ -1,6 +1,6 @@
 //go:build windows
 
-package main
+package platform
 
 // HideDockIcon is a no-op on Windows (Windows doesn't have a Dock)
 // The taskbar icon is handled by the window visibility

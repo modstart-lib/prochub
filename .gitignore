@@ -33,3 +33,4 @@ Thumbs.db
 *.dylib
 *.test
 *.out
+/AGENTS.md

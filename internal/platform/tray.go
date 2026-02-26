@@ -1,6 +1,7 @@
-package main
+package platform
 
 import (
+	"context"
 	"os"
 	goruntime "runtime"
 	"strings"
@@ -9,17 +10,28 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
+// AppRef defines the interface TrayManager needs from the main App.
+// This avoids a circular import between internal/platform and package main.
+type AppRef interface {
+	GetLocale() string
+	GetCtx() context.Context
+}
+
 // TrayManager manages the system tray icon and menu
 type TrayManager struct {
-	app   *App
-	mShow *systray.MenuItem
-	mQuit *systray.MenuItem
+	app              AppRef
+	trayIcon         []byte
+	trayIconWindows  []byte
+	mShow            *systray.MenuItem
+	mQuit            *systray.MenuItem
 }
 
 // NewTrayManager creates a new TrayManager
-func NewTrayManager(app *App) *TrayManager {
+func NewTrayManager(app AppRef, trayIcon []byte, trayIconWindows []byte) *TrayManager {
 	return &TrayManager{
-		app: app,
+		app:             app,
+		trayIcon:        trayIcon,
+		trayIconWindows: trayIconWindows,
 	}
 }
 
@@ -30,7 +42,7 @@ func (t *TrayManager) getLocalizedLabels() (showLabel, quitLabel string) {
 
 	// Check app configuration first
 	if t.app != nil {
-		if t.app.config.Locale == "zh" {
+		if t.app.GetLocale() == "zh" {
 			showLabel = "显示界面"
 			quitLabel = "退出"
 		}
@@ -74,9 +86,9 @@ func (t *TrayManager) onReady() {
 	// macOS: Black template icon (transparent background)
 	// Windows: Colored ICO format icon
 	if goruntime.GOOS == "windows" {
-		systray.SetIcon(trayIconWindows)
+		systray.SetIcon(t.trayIconWindows)
 	} else {
-		systray.SetIcon(trayIcon)
+		systray.SetIcon(t.trayIcon)
 	}
 	systray.SetTooltip("ProcHub - Process Manager")
 
@@ -109,23 +121,23 @@ func (t *TrayManager) onExit() {
 
 // showWindow shows the main application window and Dock icon
 func (t *TrayManager) showWindow() {
-	if t.app != nil && t.app.ctx != nil {
+	if t.app != nil && t.app.GetCtx() != nil {
 		// Show Dock icon first (macOS)
 		ShowDockIcon()
 		// Then show the window
-		runtime.WindowShow(t.app.ctx)
+		runtime.WindowShow(t.app.GetCtx())
 		// On macOS, bring window to front
 		if goruntime.GOOS == "darwin" {
-			runtime.WindowSetAlwaysOnTop(t.app.ctx, true)
-			runtime.WindowSetAlwaysOnTop(t.app.ctx, false)
+			runtime.WindowSetAlwaysOnTop(t.app.GetCtx(), true)
+			runtime.WindowSetAlwaysOnTop(t.app.GetCtx(), false)
 		}
 	}
 }
 
 // quitApp properly quits the application
 func (t *TrayManager) quitApp() {
-	if t.app != nil && t.app.ctx != nil {
-		runtime.Quit(t.app.ctx)
+	if t.app != nil && t.app.GetCtx() != nil {
+		runtime.Quit(t.app.GetCtx())
 	}
 	systray.Quit()
 }

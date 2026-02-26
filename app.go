@@ -13,11 +13,12 @@ import (
 	"strings"
 	"time"
 
-	"prochub/app/config"
-	"prochub/app/logging"
-	"prochub/app/process"
-	"prochub/app/service"
-	"prochub/app/store"
+	"prochub/internal/config"
+	"prochub/internal/logging"
+	"prochub/internal/platform"
+	"prochub/internal/process"
+	"prochub/internal/service"
+	"prochub/internal/store"
 
 	"github.com/google/uuid"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -58,6 +59,16 @@ func NewApp() *App {
 		loggers:      make(map[string]*ProcessLogger),
 		autoStartMgr: service.NewAutoStartManager(AppName, AppDisplayName),
 	}
+}
+
+// GetLocale returns the current app locale, implementing platform.AppRef
+func (a *App) GetLocale() string {
+	return a.config.Locale
+}
+
+// GetCtx returns the Wails context, implementing platform.AppRef
+func (a *App) GetCtx() context.Context {
+	return a.ctx
 }
 
 // startup is called when the app starts. The context is saved
@@ -678,7 +689,7 @@ func (a *App) ShowWindow() {
 func (a *App) HideWindow() {
 	runtime.WindowHide(a.ctx)
 	// Hide Dock icon on macOS
-	HideDockIcon()
+	platform.HideDockIcon()
 }
 
 // QuitApp quits the application

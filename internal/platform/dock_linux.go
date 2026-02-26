@@ -1,6 +1,6 @@
 //go:build linux
 
-package main
+package platform
 
 // HideDockIcon is a no-op on Linux
 func HideDockIcon() {

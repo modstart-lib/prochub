@@ -5,7 +5,8 @@ import (
 	"embed"
 	goruntime "runtime"
 
-	"fyne.io/systray"
+	"prochub/internal/platform"
+
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/menu"
 	"github.com/wailsapp/wails/v2/pkg/menu/keys"
@@ -31,7 +32,7 @@ var trayIconWindows []byte
 
 // Global app reference for tray menu callbacks
 var globalApp *App
-var trayManager *TrayManager
+var trayManager *platform.TrayManager
 
 // UpdateTrayLanguage updates the system tray menu language
 func UpdateTrayLanguage() {
@@ -81,7 +82,7 @@ func wrapStartup(app *App) func(ctx context.Context) {
 		runtime.WindowShow(ctx)
 
 		// Initialize and start system tray after Wails is ready
-		trayManager = NewTrayManager(app)
+		trayManager = platform.NewTrayManager(app, trayIcon, trayIconWindows)
 		go trayManager.Run()
 	}
 }
@@ -91,7 +92,7 @@ func wrapShutdown(app *App) func(ctx context.Context) {
 	return func(ctx context.Context) {
 		// Stop systray
 		if trayManager != nil {
-			systray.Quit()
+			trayManager.Quit()
 		}
 		// Call original shutdown
 		app.shutdown(ctx)
@@ -126,7 +127,7 @@ func main() {
 			// Hide the window
 			runtime.WindowHide(ctx)
 			// Hide Dock icon on macOS
-			HideDockIcon()
+			platform.HideDockIcon()
 			// Prevent the default close behavior (quitting the app)
 			return true
 		},
@@ -173,7 +174,7 @@ func main() {
 			OnSecondInstanceLaunch: func(secondInstanceData options.SecondInstanceData) {
 				if globalApp != nil && globalApp.ctx != nil {
 					// Show Dock icon first (macOS)
-					ShowDockIcon()
+					platform.ShowDockIcon()
 					// Show the window
 					runtime.WindowShow(globalApp.ctx)
 					if goruntime.GOOS == "darwin" {

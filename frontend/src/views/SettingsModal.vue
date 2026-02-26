@@ -1,18 +1,22 @@
 <script lang="ts" setup>
-import { Button, Card, Divider, message, Modal, RadioButton, RadioGroup, Select, Switch } from 'ant-design-vue';
-import { Globe, Info, Languages, MessageSquare, Moon, Power, RefreshCw, Sun } from 'lucide-vue-next';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { GetAppConfig, GetAppName, GetAutoStartEnabled, GetPlatform, GetProcessLogs, GetSystemLogs, GetSystemVersion, ListProcesses, SetAutoStartEnabled } from '../../../wailsjs/go/main/App';
-import { trackVisit } from '../../services/analytics';
-import { checkVersionAndPrompt, getAppVersion, isAppStoreBuild } from '../../services/version';
-import { useAppStore } from '../../stores/app';
+import { Button, Card, Divider, Modal, RadioButton, RadioGroup, Select, Switch, message } from 'ant-design-vue';
+import { Globe, Info, Languages, Moon, Power, RefreshCw, Sun } from 'lucide-vue-next';
+import { computed, onMounted, ref, watch } from 'vue';
+import { GetAutoStartEnabled, SetAutoStartEnabled } from '../../wailsjs/go/main/App';
+import { trackVisit } from '../services/analytics';
+import { checkVersionAndPrompt, getAppVersion } from '../services/version';
+import { useAppStore } from '../stores/app';
 
-const appStore = useAppStore()
+const props = defineProps<{ visible: boolean }>()
 
-// Track visit on mount
-onMounted(() => {
-  trackVisit('Settings')
+// Track visit when modal opens
+watch(() => props.visible, (visible) => {
+  if (visible) {
+    trackVisit('Settings')
+  }
 })
+const emit = defineEmits<{ 'update:visible': [boolean] }>()
+const appStore = useAppStore()
 
 const themeMode = computed({
   get: () => (appStore.isDark ? 'dark' : 'light'),
@@ -35,34 +39,32 @@ const languageOptions = [
 
 const autoStart = ref(false)
 const appVersion = ref('')
-const feedbackUrl = ref('')
-const showFeedbackModal = ref(false)
 
-// Load appVersion and config on mount
+// Load appVersion on mount
 onMounted(async () => {
   appVersion.value = await getAppVersion()
-  try {
-    const config = await GetAppConfig()
-    if (config && config.feedbackUrl) {
-      feedbackUrl.value = config.feedbackUrl
-    }
-  } catch (e) {
-    console.error('Failed to load app config:', e)
-  }
-  
-  try {
-    autoStart.value = await GetAutoStartEnabled()
-  } catch (e) {
-    console.error('Failed to load auto-start status:', e)
-  }
 })
+
+// Load autoStart status when modal opens
+watch(() => props.visible, async (visible) => {
+  if (visible) {
+    try {
+      // Get actual system auto-start status instead of config value
+      autoStart.value = await GetAutoStartEnabled()
+    } catch (e) {
+      console.error('Failed to load auto-start status:', e)
+    }
+  }
+}, { immediate: true })
 
 const toggleAutoStart = async (checked: boolean | string | number) => {
   try {
+    // Call backend to enable/disable system-level auto-start
     await SetAutoStartEnabled(!!checked)
     autoStart.value = !!checked
   } catch (e) {
     console.error('Failed to update auto-start:', e)
+    // Revert the switch on error
     autoStart.value = !checked
   }
 }
@@ -88,101 +90,19 @@ const copyGithubLink = async () => {
     message.error(appStore.t('settings.linkCopyFailed'))
   }
 }
-
-
-const handleFeedbackMessage = async (event: MessageEvent) => {
-  if (!event.data || !event.data.type) return
-
-  const type = event.data.type
-
-  if (type === 'FeedbackTicket:env') {
-    try {
-      const name = await GetAppName()
-      const version = await getAppVersion()
-      const processes = await ListProcesses()
-      const platform = await GetPlatform()
-      const systemVersion = await GetSystemVersion()
-      
-      const envData = {
-        name,
-        version,
-        platform,
-        systemVersion,
-        processes: processes.map((p: any) => ({
-          name: p.definition.name,
-          status: p.status,
-          restarts: p.restarts
-        }))
-      }
-      
-      if (event.source) {
-        (event.source as Window).postMessage({
-          type: 'FeedbackTicket:env',
-          data: envData
-        }, '*')
-      }
-    } catch (e) {
-      console.error('Failed to collect env:', e)
-    }
-  } else if (type === 'FeedbackTicket:log') {
-    try {
-      const processes = await ListProcesses()
-      let allLogs = ''
-      
-      // Collect logs from all processes
-      for (const p of processes) {
-        const logs = await GetProcessLogs(p.definition.id)
-        if (logs && logs.length > 0) {
-          allLogs += `\n=== Process: ${p.definition.name} ===\n`
-          allLogs += logs.map((l: any) => `[${l.timestamp}] ${l.stream}: ${l.line}`).join('\n')
-          allLogs += '\n'
-        }
-      }
-      
-      // Collect system logs
-      const systemLogs = await GetSystemLogs()
-      if (systemLogs) {
-        allLogs += '\n' + systemLogs
-      }
-      
-      const now = new Date()
-      const startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
-      const endTime = now.toISOString()
-      
-      if (event.source) {
-        (event.source as Window).postMessage({
-          type: 'FeedbackTicket:log',
-          data: {
-            logs: allLogs,
-            startTime,
-            endTime
-          }
-        }, '*')
-      }
-    } catch (e) {
-      console.error('Failed to collect logs:', e)
-    }
-  }
-}
-
-// Register message listener
-onMounted(() => {
-  window.addEventListener('message', handleFeedbackMessage)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('message', handleFeedbackMessage)
-})
 </script>
 
 <template>
-  <div class="settings-page">
-    <div class="settings-header">
-      <h2 class="settings-title">{{ appStore.t('settings.title') }}</h2>
-    </div>
-
+  <Modal
+    :open="props.visible"
+    :title="appStore.t('settings.title')"
+    width="480px"
+    :footer="null"
+    class="settings-modal"
+    @cancel="emit('update:visible', false)"
+  >
     <div class="settings-content">
-      <!-- 主题设置 -->
+      <!-- Theme Settings -->
       <div class="setting-section">
         <div class="section-header">
           <div class="section-icon theme-icon">
@@ -210,7 +130,7 @@ onUnmounted(() => {
 
       <Divider class="section-divider" />
 
-      <!-- 语言设置 -->
+      <!-- Language Settings -->
       <div class="setting-section">
         <div class="section-header">
           <div class="section-icon language-icon">
@@ -237,7 +157,7 @@ onUnmounted(() => {
 
       <Divider class="section-divider" />
 
-      <!-- 开机自动启动 -->
+      <!-- Auto-start on Boot -->
       <div class="setting-section">
         <div class="section-header">
           <div class="section-icon autostart-icon">
@@ -256,10 +176,10 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <Divider v-if="!isAppStoreBuild" class="section-divider" />
+      <Divider class="section-divider" />
 
-      <!-- 版本检测 -->
-      <div v-if="!isAppStoreBuild" class="setting-section">
+      <!-- Version Check -->
+      <div class="setting-section">
         <div class="section-header">
           <div class="section-icon version-icon">
             <RefreshCw :size="18" />
@@ -289,7 +209,7 @@ onUnmounted(() => {
 
       <Divider class="section-divider" />
 
-      <!-- 关于 -->
+      <!-- About -->
       <Card class="about-card" :bordered="false">
         <template #title>
           <div class="about-header">
@@ -309,62 +229,24 @@ onUnmounted(() => {
               <Globe :size="14" />
               github.com/modstart-lib/prochub
             </span>
-            <Button 
-              v-if="feedbackUrl"
-              type="primary" 
-              size="small"
-              class="feedback-btn ml-auto"
-              @click="showFeedbackModal = true"
-            >
-              <template #icon>
-                <MessageSquare :size="14" />
-              </template>
-              工单反馈
-            </Button>
           </div>
         </div>
       </Card>
     </div>
-
-    <!-- Feedback Modal -->
-    <Modal
-      v-model:open="showFeedbackModal"
-      title="工单反馈"
-      :footer="null"
-      width="600px"
-      style="top: 20px"
-      :bodyStyle="{ padding: 0, height: '70vh', overflow: 'visible' }"
-    >
-      <div style="width:calc(48px + 100%); height:calc(20px + 100%);overflow:hidden;border-radius:0 0 8px 8px;margin:0px 24px -20px -24px;">
-        <iframe 
-          v-if="feedbackUrl" 
-          :src="feedbackUrl" 
-          style="width: 100%; height: 100%;"
-        ></iframe>
-      </div>
-    </Modal>
-  </div>
+  </Modal>
 </template>
 
 <style scoped>
-.settings-page {
-  @apply flex flex-col rounded-xl border border-slate-200/60 bg-white/80 backdrop-blur-sm dark:border-slate-700/60 dark:bg-slate-800/80 p-6;
-}
-
-.settings-header {
-  @apply pb-4 border-b border-slate-200 dark:border-slate-700;
-}
-
-.settings-title {
-  @apply text-xl font-bold text-slate-800 dark:text-slate-200;
+.settings-modal :deep(.ant-modal-content) {
+  @apply rounded-xl overflow-hidden;
 }
 
 .settings-content {
-  @apply pt-6;
+  @apply pt-2;
 }
 
 .setting-section {
-  @apply flex flex-row items-center justify-between gap-4;
+  @apply flex flex-col gap-3;
 }
 
 .section-header {
@@ -404,7 +286,7 @@ onUnmounted(() => {
 }
 
 .section-control {
-  @apply flex items-center;
+  @apply mt-2;
 }
 
 .theme-button {
@@ -424,6 +306,18 @@ onUnmounted(() => {
 }
 
 .current-version {
+  @apply text-xs text-slate-500 dark:text-slate-400;
+}
+
+.version-info {
+  @apply mt-2 flex flex-col gap-1;
+}
+
+.new-version {
+  @apply text-sm font-medium text-indigo-600 dark:text-indigo-400;
+}
+
+.release-time {
   @apply text-xs text-slate-500 dark:text-slate-400;
 }
 
@@ -463,15 +357,15 @@ onUnmounted(() => {
   @apply flex items-center gap-2;
 }
 
+.version-badge {
+  @apply rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-400;
+}
+
 .github-link {
   @apply flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors cursor-pointer;
 }
 
-.feedback-btn {
-  @apply flex items-center gap-1.5 text-xs;
-}
-
-/* 主题切换按钮样式修复 */
+/* Theme toggle button style fix */
 .section-control :deep(.ant-radio-group) {
   @apply flex;
 }

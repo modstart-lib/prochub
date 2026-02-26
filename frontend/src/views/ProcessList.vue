@@ -2,11 +2,11 @@
 import { Button, Input, message, Spin, Switch, Tag, Tooltip } from 'ant-design-vue'
 import { Cpu, FileText, Hash, Pencil, Play, Plus, RefreshCw, RotateCw, Square } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
-import type { ProcessItem } from '../../stores/app'
-import { useAppStore } from '../../stores/app'
-import AddProcessModal from '../modals/AddProcessModal.vue'
-import EditProcessModal from '../modals/EditProcessModal.vue'
-import LogsModal from '../modals/LogsModal.vue'
+import type { ProcessItem } from '../stores/app'
+import { useAppStore } from '../stores/app'
+import AddProcessModal from './ProcessList/AddProcessModal.vue'
+import EditProcessModal from './ProcessList/EditProcessModal.vue'
+import LogsModal from './ProcessList/LogsModal.vue'
 
 const appStore = useAppStore()
 const showModal = ref(false)
