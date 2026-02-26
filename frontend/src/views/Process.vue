@@ -4,9 +4,9 @@ import { Cpu, FileText, Hash, Pencil, Play, Plus, RefreshCw, RotateCw, Square } 
 import { computed, onMounted, ref } from 'vue'
 import type { ProcessItem } from '../stores/app'
 import { useAppStore } from '../stores/app'
-import AddProcessModal from './ProcessList/AddProcessModal.vue'
-import EditProcessModal from './ProcessList/EditProcessModal.vue'
-import LogsModal from './ProcessList/LogsModal.vue'
+import AddProcessModal from '@/views/Process/AddProcessModal.vue'
+import EditProcessModal from '@/views/Process/EditProcessModal.vue'
+import LogsModal from '@/views/Process/LogsModal.vue'
 
 const appStore = useAppStore()
 const showModal = ref(false)
@@ -102,7 +102,7 @@ const handleLogs = async (process: ProcessItem) => {
         <span class="process-count">{{ filteredProcesses.length }} {{ appStore.t('processes.title') }}</span>
       </div>
       <div class="header-actions">
-        <Input 
+        <Input
           v-model:value="searchQuery"
           :placeholder="appStore.t('actions.search') || 'Search...'"
           class="search-input"
@@ -155,10 +155,10 @@ const handleLogs = async (process: ProcessItem) => {
           <div class="card-meta">
             <div class="meta-left">
               <div class="meta-item">
-                <Switch 
-                  :checked="process.autoStart" 
-                  size="small" 
-                  disabled 
+                <Switch
+                  :checked="process.autoStart"
+                  size="small"
+                  disabled
                 />
                 <span class="meta-label">{{ appStore.t('processes.autoStart') }}</span>
               </div>

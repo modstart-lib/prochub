@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { AlertCircle, PlayCircle, StopCircle } from 'lucide-vue-next';
-import { useAppStore } from '../stores/app';
+import { useAppStore } from '../../stores/app';
 
 const appStore = useAppStore()
 </script>
