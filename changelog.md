@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Improvements
+- Remove `com.apple.security.network.server` entitlement from macOS entitlements / 从 macOS entitlements 中移除 `com.apple.security.network.server` 权限
+
+### Others
+- Bump version to v0.5.9 / 版本升级至 v0.5.9
+
 ## [v0.5.8] - 2026-02-24
 
 ### Features

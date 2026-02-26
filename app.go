@@ -501,7 +501,7 @@ var appConfig = struct {
 	Name:            "ProcHub",
 	Title:           "ProcHub",
 	Slogan:          "Manage processes easily",
-	Version:         "v0.5.8",
+	Version:         "v0.5.9",
 	Website:         baseURL,
 	WebsiteGithub:   "https://github.com/modstart-lib/prochub",
 	WebsiteGitee:    "https://gitee.com/modstart-lib/prochub",
