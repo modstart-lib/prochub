@@ -7,6 +7,7 @@
 
 ### Improvements
 - Remove `com.apple.security.network.server` entitlement from macOS entitlements / 从 macOS entitlements 中移除 `com.apple.security.network.server` 权限
+- Disable browser spellcheck on `<body>` element by setting `spellcheck="false"` / 通过在 `<body>` 元素上设置 `spellcheck="false"` 禁用浏览器拼写检查
 
 ### Others
 - Add new asset `res/logo.svg.black.svg` / 新增资源文件 `res/logo.svg.black.svg`
