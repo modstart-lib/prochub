@@ -2,12 +2,14 @@
 
 ## [Unreleased]
 
-### Fixes
-- Update import paths and component references after moving and renaming view files / 在移动和重命名视图文件后修复导入路径和组件引用
-
 ### Improvements
+- Refactor `Setting.vue` by splitting it into dedicated sub-components: `SettingTheme`, `SettingLanguage`, `SettingAutoStart`, `SettingVersion`, `SettingAbout` / 将 `Setting.vue` 拆分为独立子组件：`SettingTheme`、`SettingLanguage`、`SettingAutoStart`、`SettingVersion`、`SettingAbout`，提升代码可维护性
+- Refactor Process modal components: rename `AddModal`, `EditModal`, `LogsModal` to `ProcessAddModal`, `ProcessEditModal`, `ProcessLogsModal` and extract `ProcessDashboardSummary` as a new component / 重构进程模态框组件：将 `AddModal`、`EditModal`、`LogsModal` 重命名为 `ProcessAddModal`、`ProcessEditModal`、`ProcessLogsModal`，并新增 `ProcessDashboardSummary` 组件
 - Remove `com.apple.security.network.server` entitlement from macOS entitlements / 从 macOS entitlements 中移除 `com.apple.security.network.server` 权限
 - Disable browser spellcheck on `<body>` element by setting `spellcheck="false"` / 通过在 `<body>` 元素上设置 `spellcheck="false"` 禁用浏览器拼写检查
+
+### Fixes
+- Update import paths and component references after moving and renaming view files / 在移动和重命名视图文件后修复导入路径和组件引用
 
 ### Others
 - Add new asset `res/logo.svg.black.svg` / 新增资源文件 `res/logo.svg.black.svg`

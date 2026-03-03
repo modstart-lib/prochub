@@ -4,9 +4,9 @@ import { Cpu, FileText, Hash, Pencil, Play, Plus, RefreshCw, RotateCw, Square } 
 import { computed, onMounted, ref } from 'vue'
 import type { ProcessItem } from '../stores/app'
 import { useAppStore } from '../stores/app'
-import AddProcessModal from '@/views/Process/AddProcessModal.vue'
-import EditProcessModal from '@/views/Process/EditProcessModal.vue'
-import LogsModal from '@/views/Process/LogsModal.vue'
+import ProcessAddModal from '@/views/Process/ProcessAddModal.vue'
+import ProcessEditModal from '@/views/Process/ProcessEditModal.vue'
+import ProcessLogsModal from '@/views/Process/ProcessLogsModal.vue'
 
 const appStore = useAppStore()
 const showModal = ref(false)
@@ -211,9 +211,9 @@ const handleLogs = async (process: ProcessItem) => {
     </div>
 
     <!-- 模态框 -->
-    <AddProcessModal v-model:visible="showModal" />
-    <EditProcessModal v-model:visible="showEditModal" :process="editingProcess" />
-    <LogsModal
+    <ProcessAddModal v-model:visible="showModal" />
+    <ProcessEditModal v-model:visible="showEditModal" :process="editingProcess" />
+    <ProcessLogsModal
       v-model:visible="showLogsModal"
       :process-id="logsProcess?.id || ''"
       :process-name="logsProcess?.name || ''"

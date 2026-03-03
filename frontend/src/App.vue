@@ -5,7 +5,7 @@ import zhCN from 'ant-design-vue/es/locale/zh_CN'
 import { Cpu, Settings } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import AppLogo from './components/AppLogo.vue'
-import DashboardSummary from './views/Process/DashboardSummary.vue'
+import ProcessDashboardSummary from './views/Process/ProcessDashboardSummary.vue'
 import ProcessList from './views/Process.vue'
 import SettingsPage from './views/Setting.vue'
 import { trackVisit } from './services/analytics'
@@ -78,7 +78,7 @@ const activeTab = ref('processes')
         <div class="main-content">
           <!-- Processes View -->
           <div v-show="activeTab === 'processes'" class="content-view">
-            <DashboardSummary />
+            <ProcessDashboardSummary />
             <ProcessList />
           </div>
 
