@@ -6,7 +6,7 @@
 #   version: e.g. 0.6.0
 #
 # Requires: wails build output at build/bin/ProcHub, build/appicon.png
-# Outputs:  ProcHub-linux-<goarch>.deb / .AppImage (repo root)
+# Outputs:  ProcHub-<version>-linux-<goarch>.deb / .AppImage (repo root)
 
 set -euo pipefail
 
@@ -65,9 +65,9 @@ fpm -s dir -t deb \
   --url "https://modstart.com" \
   --license "Apache-2.0" \
   -C "$PKG_DIR" \
-  -p "ProcHub-linux-${GOARCH}.deb" >/dev/null
+  -p "ProcHub-${VERSION}-linux-${GOARCH}.deb" >/dev/null
 rm -rf "$PKG_DIR"
-echo "✅ deb: ProcHub-linux-${GOARCH}.deb"
+echo "✅ deb: ProcHub-${VERSION}-linux-${GOARCH}.deb"
 
 # ── AppImage (via appimagetool) ────────────────────────────────
 if [ ! -f appimagetool ]; then
@@ -85,10 +85,10 @@ printf '%s' "$DESKTOP_CONTENT" > "$APPDIR/prochub.desktop"
 printf '#!/bin/sh\nexec "$(dirname "$0")/usr/bin/prochub" "$@"\n' > "$APPDIR/AppRun"
 chmod +x "$APPDIR/AppRun"
 
-APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool "$APPDIR" "ProcHub-linux-${GOARCH}.AppImage" >/dev/null 2>&1
+APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool "$APPDIR" "ProcHub-${VERSION}-linux-${GOARCH}.AppImage" >/dev/null 2>&1
 rm -rf "$APPDIR"
-echo "✅ AppImage: ProcHub-linux-${GOARCH}.AppImage"
+echo "✅ AppImage: ProcHub-${VERSION}-linux-${GOARCH}.AppImage"
 
 echo ""
 echo "Packaged files:"
-ls -lh ProcHub-linux-${GOARCH}.deb ProcHub-linux-${GOARCH}.AppImage
+ls -lh ProcHub-${VERSION}-linux-${GOARCH}.deb ProcHub-${VERSION}-linux-${GOARCH}.AppImage

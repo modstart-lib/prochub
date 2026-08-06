@@ -155,8 +155,14 @@ jobs:
         shell: pwsh
         run: |
           wails build -platform windows/${{ matrix.goarch }} -trimpath -ldflags "-s -w" -nsis
+          $VERSION = (Select-String -Path app.go -Pattern 'Version:\s*"v*([^"]*)"').Matches.Groups[1].Value
+          echo "VERSION=$VERSION"
           cd build/bin
-          7z a ../../ProcHub-windows-${{ matrix.goarch }}.zip ProcHub.exe
+          7z a "../../ProcHub-${VERSION}-windows-${{ matrix.goarch }}.zip" ProcHub.exe
+          $installer = Get-ChildItem -Filter "*-installer.exe" | Select-Object -First 1
+          if ($installer) {
+            Rename-Item -Path $installer.FullName -NewName "ProcHub-${VERSION}-${{ matrix.goarch }}-installer.exe"
+          }
           cd ../..
 
       - name: Build Release Files (macOS)
@@ -171,6 +177,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           wails build -platform darwin/${{ matrix.goarch }} -trimpath -ldflags "-s -w"
+          VERSION=$(sed -n 's/.*Version:[[:space:]]*"v*\([^"]*\)".*/\1/p' app.go | head -1)
 
           APP_PATH="build/bin/ProcHub.app"
 
@@ -200,26 +207,26 @@ jobs:
             --hide-extension "ProcHub.app" \
             --app-drop-link 450 185 \
             --no-internet-enable \
-            "ProcHub-darwin-${{ matrix.goarch }}.dmg" \
+            "ProcHub-${VERSION}-darwin-${{ matrix.goarch }}.dmg" \
             "build/bin/ProcHub.app" || true
 
           # Fallback: if create-dmg fails, use hdiutil
-          if [ ! -f "ProcHub-darwin-${{ matrix.goarch }}.dmg" ]; then
-            hdiutil create -volname "ProcHub" -srcfolder "build/bin/ProcHub.app" -ov -format UDZO "ProcHub-darwin-${{ matrix.goarch }}.dmg"
+          if [ ! -f "ProcHub-${VERSION}-darwin-${{ matrix.goarch }}.dmg" ]; then
+            hdiutil create -volname "ProcHub" -srcfolder "build/bin/ProcHub.app" -ov -format UDZO "ProcHub-${VERSION}-darwin-${{ matrix.goarch }}.dmg"
           fi
 
           # Sign DMG
-          codesign --force --sign "$SIGNING_IDENTITY" "ProcHub-darwin-${{ matrix.goarch }}.dmg"
+          codesign --force --sign "$SIGNING_IDENTITY" "ProcHub-${VERSION}-darwin-${{ matrix.goarch }}.dmg"
 
           # Notarize
-          xcrun notarytool submit "ProcHub-darwin-${{ matrix.goarch }}.dmg" \
+          xcrun notarytool submit "ProcHub-${VERSION}-darwin-${{ matrix.goarch }}.dmg" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
             --wait
 
           # Staple the notarization ticket
-          xcrun stapler staple "ProcHub-darwin-${{ matrix.goarch }}.dmg"
+          xcrun stapler staple "ProcHub-${VERSION}-darwin-${{ matrix.goarch }}.dmg"
 
       - name: Set Build Name ( Linux / macOS )
         if: runner.os == 'Linux' || runner.os == 'macOS'
@@ -244,15 +251,15 @@ jobs:
         with:
           name: prochub-win-${{ matrix.goarch }}
           path: |
-            code/ProcHub-windows-${{ matrix.goarch }}.zip
-            code/build/bin/*-installer.exe
+            code/ProcHub-*-windows-${{ matrix.goarch }}.zip
+            code/build/bin/ProcHub-*-installer.exe
 
       - name: Upload Artifact (macOS)
         if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
           name: prochub-mac-${{ matrix.goarch }}
-          path: code/ProcHub-darwin-${{ matrix.goarch }}.dmg
+          path: code/ProcHub-*-darwin-${{ matrix.goarch }}.dmg
 
       - name: Upload Artifact (Linux)
         if: runner.os == 'Linux'
@@ -260,8 +267,8 @@ jobs:
         with:
           name: prochub-linux-${{ matrix.goarch }}
           path: |
-            code/ProcHub-linux-${{ matrix.goarch }}.deb
-            code/ProcHub-linux-${{ matrix.goarch }}.AppImage
+            code/ProcHub-*-linux-${{ matrix.goarch }}.deb
+            code/ProcHub-*-linux-${{ matrix.goarch }}.AppImage
 
       - name: Upload to OSS
         id: oss-upload
@@ -275,11 +282,11 @@ jobs:
           callbackTitle: 🎉ProcHub-${{ runner.os }}-Release-${{ github.ref_name }}
           callback: ${{ secrets.REPORT_URL_ME }}
           assets: |
-              code/ProcHub-linux-*.deb:apps/{random}.bin:{name}.deb
-              code/ProcHub-linux-*.AppImage:apps/{random}.bin:{name}.AppImage
-              code/ProcHub-windows-*.zip:apps/{random}.bin:{name}.zip
-              code/build/bin/*-installer.exe:apps/{random}.bin:{name}.exe
-              code/ProcHub-darwin-*.dmg:apps/{random}.bin:{name}.dmg
+              code/ProcHub-*-linux-*.deb:apps/{random}.bin:{name}.deb
+              code/ProcHub-*-linux-*.AppImage:apps/{random}.bin:{name}.AppImage
+              code/ProcHub-*-windows-*.zip:apps/{random}.bin:{name}.zip
+              code/build/bin/ProcHub-*-installer.exe:apps/{random}.bin:{name}.exe
+              code/ProcHub-*-darwin-*.dmg:apps/{random}.bin:{name}.dmg
 
       - name: Save OSS Downloads for Notify
         shell: bash
