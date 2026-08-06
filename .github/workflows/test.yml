@@ -146,7 +146,7 @@ jobs:
         run: |
             NAME="${{ github.event.repository.name }}"
             TYPE=$(echo "${{ github.workflow }}" | tr '[:upper:]' '[:lower:]')
-            VERSION=$(sed -n 's/.*Version:[[:space:]]*"v\([^"]*\)".*/\1/p' app.go | head -1)
+            VERSION=$(sed -n 's/.*Version:[[:space:]]*"v*\([^"]*\)".*/\1/p' app.go | head -1)
             curl -X POST "${{ secrets.HOOK_URL }}" \
               -H "Content-Type: application/json" \
               -d "{\"event\":\"${NAME}\",\"param\":{\"name\":\"${NAME}\",\"type\":\"${TYPE}\",\"version\":\"${VERSION}\"},\"data\":{\"name\":\"${NAME}\",\"type\":\"${TYPE}\",\"version\":\"${VERSION}\"}}"

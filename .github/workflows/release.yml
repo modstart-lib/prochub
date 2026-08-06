@@ -146,7 +146,7 @@ jobs:
         working-directory: code
         run: |
           wails build -platform linux/${{ matrix.goarch }} -trimpath -ldflags "-s -w"
-          VERSION=$(sed -n 's/.*Version:[[:space:]]*"v\([^"]*\)".*/\1/p' app.go | head -1)
+          VERSION=$(sed -n 's/.*Version:[[:space:]]*"v*\([^"]*\)".*/\1/p' app.go | head -1)
           bash scripts/package-linux.sh ${{ matrix.goarch }} "$VERSION"
 
       - name: Build Release Files (Windows)
@@ -368,7 +368,7 @@ jobs:
 
           NAME="${{ github.event.repository.name }}"
           TYPE=$(echo "${{ github.workflow }}" | tr '[:upper:]' '[:lower:]')
-          VERSION=$(sed -n 's/.*Version:[[:space:]]*"v\([^"]*\)".*/\1/p' app.go | head -1)
+          VERSION=$(sed -n 's/.*Version:[[:space:]]*"v*\([^"]*\)".*/\1/p' app.go | head -1)
 
           PAYLOAD=$(node -e "
             const p = {
