@@ -261,7 +261,6 @@ jobs:
         with:
           name: prochub-linux-${{ matrix.goarch }}
           path: |
-            code/ProcHub-linux-${{ matrix.goarch }}.tar.gz
             code/ProcHub-linux-${{ matrix.goarch }}.deb
             code/ProcHub-linux-${{ matrix.goarch }}.AppImage
 
@@ -277,7 +276,6 @@ jobs:
           callbackTitle: ✅ProcHub-${{ runner.os }}-打包成功
           callback: ${{ secrets.REPORT_URL_ME }}
           assets: |
-              code/ProcHub-linux-*.tar.gz:apps/{random}.bin:{name}.gz
               code/ProcHub-linux-*.deb:apps/{random}.bin:{name}.deb
               code/ProcHub-linux-*.AppImage:apps/{random}.bin:{name}.AppImage
               code/ProcHub-windows-*.zip:apps/{random}.bin:{name}.zip

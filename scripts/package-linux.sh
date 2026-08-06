@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Package ProcHub Linux release: tar.gz + deb + AppImage
+# Package ProcHub Linux release: deb + AppImage
 #
 # Usage: scripts/package-linux.sh <goarch> <version>
 #   goarch:  amd64 | arm64
 #   version: e.g. 0.6.0
 #
 # Requires: wails build output at build/bin/ProcHub, build/appicon.png
-# Outputs:  ProcHub-linux-<goarch>.tar.gz / .deb / .AppImage (repo root)
+# Outputs:  ProcHub-linux-<goarch>.deb / .AppImage (repo root)
 
 set -euo pipefail
 
@@ -40,10 +40,6 @@ Terminal=false
 Type=Application
 Categories=Utility;System;
 '
-
-# ── tar.gz (bare binary, always kept) ──────────────────────────
-(cd build/bin && tar -czf ../../ProcHub-linux-${GOARCH}.tar.gz ProcHub)
-echo "✅ tar.gz: ProcHub-linux-${GOARCH}.tar.gz"
 
 # ── deb (via fpm) ──────────────────────────────────────────────
 if ! command -v fpm >/dev/null 2>&1; then
@@ -95,4 +91,4 @@ echo "✅ AppImage: ProcHub-linux-${GOARCH}.AppImage"
 
 echo ""
 echo "Packaged files:"
-ls -lh ProcHub-linux-${GOARCH}.tar.gz ProcHub-linux-${GOARCH}.deb ProcHub-linux-${GOARCH}.AppImage
+ls -lh ProcHub-linux-${GOARCH}.deb ProcHub-linux-${GOARCH}.AppImage
