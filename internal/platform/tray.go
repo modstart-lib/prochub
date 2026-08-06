@@ -143,9 +143,18 @@ func (t *TrayManager) quitApp() {
 }
 
 // Run starts the systray.
-// We use RunWithExternalLoop instead of Run so that fyne.io/systray does NOT
-// call [NSApp run] / nativeLoop on macOS. Wails already owns the macOS main
-// event loop; calling it a second time from a goroutine causes the
+//
+// On Windows we use systray.Run() so that the hidden tray window and its
+// message loop run on the same OS thread. fyne.io/systray's
+// RunWithExternalLoop starts the message loop on a separate goroutine on
+// Windows (nativeStart spawns one), and GetMessage only pumps the calling
+// thread's queue, so the tray window's messages (icon clicks,
+// TaskbarCreated re-registration, etc.) are never dispatched and the tray
+// icon is not shown reliably.
+//
+// On macOS we use RunWithExternalLoop instead of Run so that fyne.io/systray
+// does NOT call [NSApp run] / nativeLoop again. Wails already owns the macOS
+// main event loop; calling it a second time from a goroutine causes the
 // "nextEventMatchingMask should only be called from the Main Thread" panic
 // that freezes all AppKit dialogs (NSOpenPanel, NSSavePanel, etc.).
 //
@@ -154,6 +163,10 @@ func (t *TrayManager) quitApp() {
 // platform-specifically: on Darwin it uses dispatch_async(main_queue), on other
 // platforms it calls start() directly.
 func (t *TrayManager) Run() {
+	if goruntime.GOOS == "windows" {
+		systray.Run(t.onReady, t.onExit)
+		return
+	}
 	start, _ := systray.RunWithExternalLoop(t.onReady, t.onExit)
 	runTrayStart(start)
 }

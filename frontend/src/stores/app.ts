@@ -119,6 +119,19 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  // Toggle the auto-start flag of a process without stopping it
+  const setProcessAutoStart = async (id: string, enabled: boolean) => {
+    try {
+      await AppAPI.SetProcessAutoStart(id, enabled)
+      await loadProcesses()
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      trackError(`Failed to set auto-start: ${errorMsg}`)
+      console.error('Failed to set auto-start:', error)
+      throw error
+    }
+  }
+
   // Start a process
   const startProcess = async (id: string) => {
     try {
@@ -225,6 +238,7 @@ export const useAppStore = defineStore('app', () => {
     addProcess,
     removeProcess,
     updateProcess,
+    setProcessAutoStart,
     startProcess,
     stopProcess,
     restartProcess,

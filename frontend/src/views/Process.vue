@@ -84,6 +84,19 @@ const handleRestart = async (process: ProcessItem) => {
   }
 }
 
+const handleAutoStartToggle = async (process: ProcessItem, checked: boolean | string | number) => {
+  const enabled = !!checked
+  loadingProcessId.value = process.id
+  try {
+    await appStore.setProcessAutoStart(process.id, enabled)
+    message.success(appStore.t('messages.processUpdated'))
+  } catch (error) {
+    message.error(appStore.t('messages.operationFailed'))
+  } finally {
+    loadingProcessId.value = null
+  }
+}
+
 const handleLogs = async (process: ProcessItem) => {
   logsProcess.value = process
   showLogsModal.value = true
@@ -158,7 +171,8 @@ const handleLogs = async (process: ProcessItem) => {
                 <Switch
                   :checked="process.autoStart"
                   size="small"
-                  disabled
+                  :loading="loadingProcessId === process.id"
+                  @change="(checked: boolean | string | number) => handleAutoStartToggle(process, checked)"
                 />
                 <span class="meta-label">{{ appStore.t('processes.autoStart') }}</span>
               </div>

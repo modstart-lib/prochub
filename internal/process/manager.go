@@ -78,6 +78,20 @@ func (m *Manager) Register(def Definition) {
 	}
 }
 
+// SetAutoStart updates the auto-start flag of a process without disturbing a
+// running process (it does not stop or restart the process).
+func (m *Manager) SetAutoStart(id string, enabled bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	item, ok := m.entries[id]
+	if !ok {
+		return ErrNotFound
+	}
+	item.definition.AutoStart = enabled
+	return nil
+}
+
 // Unregister removes a process from the manager
 func (m *Manager) Unregister(id string) error {
 	m.mu.Lock()

@@ -41,6 +41,8 @@ dev: check-deps
 build: check-deps
 	wails build
 
+# 
+
 # Build the application with DevTools enabled (F12 opens inspector)
 # Note: macOS builds use private WebKit APIs - not suitable for App Store submission
 build-devtools: check-deps

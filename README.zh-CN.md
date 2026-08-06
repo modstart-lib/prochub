@@ -6,13 +6,31 @@ ProcHub 是一个跨平台的桌面进程管理应用，使用 Wails、Go 和 Vu
 
 ## 截图预览
 
-![](https://ms-assets.modstart.com/data/image/2026/02/04/6139_s17d_1578.png)
+![进程管理主页](demo/image/home.png)
 
-![](https://ms-assets.modstart.com/data/image/2026/02/04/6163_fb7s_9127.png)
+### 进程管理
 
-![](https://ms-assets.modstart.com/data/image/2026/02/04/6184_nlto_7268.png)
+![进程列表](demo/image/home.png)
 
-![](https://ms-assets.modstart.com/data/image/2026/02/04/6211_sf2x_6063.png)
+支持添加、删除、启动、停止、重启进程，可配置开机自启和重启策略，实时监控 PID、重启次数和错误信息。
+
+| 新增进程 | 编辑进程 | 进程日志 |
+|:--------:|:--------:|:--------:|
+| ![新增进程](demo/image/process-add.png) | ![编辑进程](demo/image/process-edit.png) | ![进程日志](demo/image/process-logs.png) |
+
+### 新增进程 - 高级设置与环境变量
+
+支持配置开机自启、重启策略、最大重启次数，以及自定义环境变量。
+
+| 高级设置 | 环境变量 |
+|:--------:|:--------:|
+| ![高级设置](demo/image/process-add-advanced.png) | ![环境变量](demo/image/process-add-env.png) |
+
+### 设置页
+
+主题、语言、开机自启、版本更新与关于信息统一在设置页管理。
+
+![设置页](demo/image/setting.png)
 
 ## 功能特性
 
@@ -72,26 +90,9 @@ wails build
 
 > 添加好友时备注 "ProcHub"
 
-<table width="100%">
-    <thead>
-        <tr>
-            <th width="50%">WeChat Group</th>
-            <th>QQ Group</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>
-                <img style="width:100%;"
-                     src="https://modstart.com/code_dynamic/modstart_wx" />
-            </td>
-            <td>
-                <img style="width:100%;"
-                     src="https://modstart.com/code_dynamic/modstart_qq" />
-            </td>
-        </tr>
-    </tbody>
-</table>
+| 微信交流群 | QQ 交流群 |
+|:----------:|:---------:|
+| <img src="https://open.tecmz.com/code_dynamic/wx" width="200" alt="微信交流群" /> | <img src="https://open.tecmz.com/code_dynamic/qq" width="200" alt="QQ交流群" /> |
 
 ## 许可证
 

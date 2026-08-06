@@ -12,6 +12,14 @@ frontend/dist/
 # Wails generated bindings (auto-generated on build)
 frontend/wailsjs/
 
+# Screenshot raw images and comparison baseline (keep mockup output in demo/image/)
+/storage/screenshot/image/
+/storage/screenshot-last/image/
+
+# Test artifacts
+test-results/
+*.tsbuildinfo
+
 # Package manager temp files
 frontend/package.json.md5
 
@@ -34,3 +42,4 @@ Thumbs.db
 *.test
 *.out
 /AGENTS.md
+/.agents

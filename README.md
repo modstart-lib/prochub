@@ -6,13 +6,31 @@ ProcHub is a cross-platform desktop application for process management, built wi
 
 ## Screenshot
 
-![](https://ms-assets.modstart.com/data/image/2026/02/04/6139_s17d_1578.png)
+![Process Management Home](demo/image/home.png)
 
-![](https://ms-assets.modstart.com/data/image/2026/02/04/6163_fb7s_9127.png)
+### Process Management
 
-![](https://ms-assets.modstart.com/data/image/2026/02/04/6184_nlto_7268.png)
+![Process List](demo/image/home.png)
 
-![](https://ms-assets.modstart.com/data/image/2026/02/04/6211_sf2x_6063.png)
+Add, remove, start, stop, and restart processes with auto-start and restart policies, plus real-time monitoring of PID, restart count, and errors.
+
+| Add Process | Edit Process | Process Logs |
+|:-----------:|:------------:|:------------:|
+| ![Add Process](demo/image/process-add.png) | ![Edit Process](demo/image/process-edit.png) | ![Process Logs](demo/image/process-logs.png) |
+
+### Advanced Settings & Environment Variables
+
+Configure auto-start, restart policy, max retries, and custom environment variables when adding a process.
+
+| Advanced Settings | Environment Variables |
+|:-----------------:|:---------------------:|
+| ![Advanced Settings](demo/image/process-add-advanced.png) | ![Environment Variables](demo/image/process-add-env.png) |
+
+### Settings Page
+
+Theme, language, auto-start on boot, version update, and about are managed on the settings page.
+
+![Settings Page](demo/image/setting.png)
 
 ## Features
 
@@ -73,26 +91,9 @@ wails build
 
 > Add friend with note "ProcHub"
 
-<table width="100%">
-    <thead>
-        <tr>
-            <th width="50%">WeChat Group</th>
-            <th>QQ Group</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>
-                <img style="width:100%;"
-                     src="https://modstart.com/code_dynamic/modstart_wx" />
-            </td>
-            <td>
-                <img style="width:100%;"
-                     src="https://modstart.com/code_dynamic/modstart_qq" />
-            </td>
-        </tr>
-    </tbody>
-</table>
+| WeChat Group | QQ Group |
+|:------------:|:--------:|
+| <img src="https://open.tecmz.com/code_dynamic/wx" width="200" alt="WeChat Group" /> | <img src="https://open.tecmz.com/code_dynamic/qq" width="200" alt="QQ Group" /> |
 
 ## License
 

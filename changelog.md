@@ -1,28 +1,30 @@
 # Changelog
 
-## [Unreleased]
+## v0.5.0 App Store 构建支持，组件重构更易维护
 
-### Improvements
-- Refactor `Setting.vue` by splitting it into dedicated sub-components: `SettingTheme`, `SettingLanguage`, `SettingAutoStart`, `SettingVersion`, `SettingAbout` / 将 `Setting.vue` 拆分为独立子组件：`SettingTheme`、`SettingLanguage`、`SettingAutoStart`、`SettingVersion`、`SettingAbout`，提升代码可维护性
-- Refactor Process modal components: rename `AddModal`, `EditModal`, `LogsModal` to `ProcessAddModal`, `ProcessEditModal`, `ProcessLogsModal` and extract `ProcessDashboardSummary` as a new component / 重构进程模态框组件：将 `AddModal`、`EditModal`、`LogsModal` 重命名为 `ProcessAddModal`、`ProcessEditModal`、`ProcessLogsModal`，并新增 `ProcessDashboardSummary` 组件
-- Remove `com.apple.security.network.server` entitlement from macOS entitlements / 从 macOS entitlements 中移除 `com.apple.security.network.server` 权限
-- Disable browser spellcheck on `<body>` element by setting `spellcheck="false"` / 通过在 `<body>` 元素上设置 `spellcheck="false"` 禁用浏览器拼写检查
+- 新增：新增 `isAppStoreBuild` 标识，通过 `VITE_APPSTORE_BUILD` 环境变量检测是否为 App Store 发布构建
+- 新增：在 App Store 构建中隐藏版本检测按钮并禁用启动时自动版本检测
+- 优化：将 `Setting.vue` 拆分为独立子组件：`SettingTheme`、`SettingLanguage`、`SettingAutoStart`、`SettingVersion`、`SettingAbout`，提升代码可维护性
+- 优化：重构进程模态框组件：将 `AddModal`、`EditModal`、`LogsModal` 重命名为 `ProcessAddModal`、`ProcessEditModal`、`ProcessLogsModal`，并新增 `ProcessDashboardSummary` 组件
+- 优化：从 macOS entitlements 中移除 `com.apple.security.network.server` 权限
+- 优化：通过在 `<body>` 元素上设置 `spellcheck="false"` 禁用浏览器拼写检查
+- 优化：App Store CI 工作流在 Wails 构建步骤中自动注入 `VITE_APPSTORE_BUILD=true` 环境变量
+- 修复：修复 Windows 托盘图标不显示：Windows 下改用 `systray.Run`，使托盘窗口与其消息循环在同一系统线程运行
+- 修复：修复进程卡片上无法点击的开机自启开关：移除硬编码的 `disabled`，新增 `SetProcessAutoStart` 后端接口，切换开关不会停止正在运行的进程
+- 修复：修复在移动和重命名视图文件后导入路径和组件引用错误
 
-### Fixes
-- Update import paths and component references after moving and renaming view files / 在移动和重命名视图文件后修复导入路径和组件引用
+## v0.4.0
 
-### Others
-- Add new asset `res/logo.svg.black.svg` / 新增资源文件 `res/logo.svg.black.svg`
-- Bump version to v0.5.9 / 版本升级至 v0.5.9
+- v0.4.0 发布
 
-## [v0.5.8] - 2026-02-24
+## v0.3.0
 
-### Features
-- Add `isAppStoreBuild` flag driven by `VITE_APPSTORE_BUILD` env variable to detect App Store distribution builds / 新增 `isAppStoreBuild` 标识，通过 `VITE_APPSTORE_BUILD` 环境变量检测是否为 App Store 发布构建
-- Hide version check button and disable auto version check in App Store builds / 在 App Store 构建中隐藏版本检测按钮并禁用启动时自动版本检测
+- v0.3.0 发布
 
-### Improvements
-- App Store CI workflow now passes `VITE_APPSTORE_BUILD=true` to the Wails build step automatically / App Store CI 工作流在 Wails 构建步骤中自动注入 `VITE_APPSTORE_BUILD=true` 环境变量
+## v0.2.0
 
-### Others
-- Bump version to v0.5.8 / 版本升级至 v0.5.8
+- v0.2.0 发布
+
+## v0.1.0
+
+- v0.1.0 发布

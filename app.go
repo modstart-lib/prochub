@@ -236,6 +236,34 @@ func (a *App) UpdateProcess(id string, def process.Definition) error {
 	return err
 }
 
+// SetProcessAutoStart toggles the auto-start flag of a process without
+// stopping or restarting the process if it is currently running.
+func (a *App) SetProcessAutoStart(id string, enabled bool) error {
+	found := false
+	for i, p := range a.config.Processes {
+		if p.ID == id {
+			p.AutoStart = enabled
+			a.config.Processes[i] = p
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("process %s not found", id)
+	}
+
+	if err := a.pm.SetAutoStart(id, enabled); err != nil {
+		a.LogSystemError("SetProcessAutoStart", fmt.Sprintf("Failed to update auto-start flag for process %s: %v", id, err))
+		return err
+	}
+
+	if err := a.store.Save(a.config); err != nil {
+		a.LogSystemError("SetProcessAutoStart", fmt.Sprintf("Failed to save config after updating auto-start for process %s: %v", id, err))
+		return err
+	}
+	return nil
+}
+
 // StartProcess starts a process by ID
 func (a *App) StartProcess(id string) error {
 	err := a.pm.Start(a.ctx, id)
@@ -491,7 +519,7 @@ type AnalyticsPayload struct {
 	Data []AnalyticsEvent `json:"data"`
 }
 
-const baseURL = "https://open.modstart.com/open_app/ProcHub"
+const baseURL = "https://open.tecmz.com/open_app/ProcHub"
 
 // AppConfig holds application-wide configuration
 var appConfig = struct {
@@ -512,7 +540,7 @@ var appConfig = struct {
 	Name:            "ProcHub",
 	Title:           "ProcHub",
 	Slogan:          "Manage processes easily",
-	Version:         "v0.6.0",
+	Version:         "0.5.0",
 	Website:         baseURL,
 	WebsiteGithub:   "https://github.com/modstart-lib/prochub",
 	WebsiteGitee:    "https://gitee.com/modstart-lib/prochub",
