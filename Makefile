@@ -10,6 +10,7 @@ SIGN_IDENTITY        ?= "3rd Party Mac Developer Application"
 # Installer signing identity: "3rd Party Mac Developer Installer: Your Name (TEAMID)"
 INSTALLER_IDENTITY   ?= "3rd Party Mac Developer Installer"
 
+# 
 .PHONY: help dev build clean install check-deps
 
 # Default target
@@ -57,3 +58,5 @@ build_and_install:
 	$(MAKE) build
 	sudo rm -rfv /Applications/ProcHub.app
 	sudo cp -rv build/bin/ProcHub.app /Applications/ProcHub.app
+
+# 
