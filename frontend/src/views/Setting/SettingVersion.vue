@@ -24,35 +24,34 @@ const handleCheckVersion = async () => {
 </script>
 
 <template>
-  <template v-if="!isAppStoreBuild">
-    <div class="setting-section">
-      <div class="section-header">
-        <div class="section-icon version-icon">
-          <RefreshCw :size="18" />
-        </div>
-        <div class="section-info">
-          <h3 class="section-title">{{ appStore.t('settings.version.title') }}</h3>
-          <p class="section-desc">{{ appStore.t('settings.version.desc') }}</p>
-        </div>
+  <div class="setting-section">
+    <div class="section-header">
+      <div class="section-icon version-icon">
+        <RefreshCw :size="18" />
       </div>
-      <div class="section-control">
-        <div class="version-control">
-          <span class="current-version">{{ appStore.t('settings.version.currentVersion') }}: {{ appVersion }}</span>
-          <Button
-            type="primary"
-            size="small"
-            :loading="versionChecking"
-            @click="handleCheckVersion"
-          >
-            <template #icon>
-              <RefreshCw :size="14" v-if="!versionChecking" />
-            </template>
-            {{ versionChecking ? appStore.t('settings.version.checking') : appStore.t('settings.version.checkUpdate') }}
-          </Button>
-        </div>
+      <div class="section-info">
+        <h3 class="section-title">{{ appStore.t('settings.version.title') }}</h3>
+        <p class="section-desc">{{ appStore.t('settings.version.desc') }}</p>
       </div>
     </div>
-  </template>
+    <div class="section-control">
+      <div class="version-control">
+        <span class="current-version">{{ appStore.t('settings.version.currentVersion') }}: {{ appVersion }}</span>
+        <Button
+          v-if="!isAppStoreBuild"
+          type="primary"
+          size="small"
+          :loading="versionChecking"
+          @click="handleCheckVersion"
+        >
+          <template #icon>
+            <RefreshCw :size="14" v-if="!versionChecking" />
+          </template>
+          {{ versionChecking ? appStore.t('settings.version.checking') : appStore.t('settings.version.checkUpdate') }}
+        </Button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
