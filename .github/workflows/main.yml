@@ -147,8 +147,8 @@ jobs:
         working-directory: code
         run: |
           wails build -platform linux/${{ matrix.goarch }} -trimpath -ldflags "-s -w"
-          cd build/bin
-          tar -czf ../../ProcHub-linux-${{ matrix.goarch }}.tar.gz ProcHub
+          VERSION=$(sed -n 's/.*Version:[[:space:]]*"v\([^"]*\)".*/\1/p' app.go | head -1)
+          bash scripts/package-linux.sh ${{ matrix.goarch }} "$VERSION"
 
       - name: Build Release Files (Windows)
         if: runner.os == 'Windows'
@@ -260,7 +260,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: prochub-linux-${{ matrix.goarch }}
-          path: code/ProcHub-linux-${{ matrix.goarch }}.tar.gz
+          path: |
+            code/ProcHub-linux-${{ matrix.goarch }}.tar.gz
+            code/ProcHub-linux-${{ matrix.goarch }}.deb
+            code/ProcHub-linux-${{ matrix.goarch }}.AppImage
 
       - name: Upload to OSS
         id: oss-upload
@@ -275,6 +278,8 @@ jobs:
           callback: ${{ secrets.REPORT_URL_ME }}
           assets: |
               code/ProcHub-linux-*.tar.gz:apps/{random}.bin:{name}.gz
+              code/ProcHub-linux-*.deb:apps/{random}.bin:{name}.deb
+              code/ProcHub-linux-*.AppImage:apps/{random}.bin:{name}.AppImage
               code/ProcHub-windows-*.zip:apps/{random}.bin:{name}.zip
               code/build/bin/*-installer.exe:apps/{random}.bin:{name}.exe
               code/ProcHub-darwin-*.dmg:apps/{random}.bin:{name}.dmg
