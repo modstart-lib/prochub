@@ -33,9 +33,6 @@ jobs:
           - name: win-x64
             os: windows-latest
             goarch: amd64
-          - name: win-arm64
-            os: windows-11-arm
-            goarch: arm64
 
     steps:
       - name: Checkout Code
@@ -154,13 +151,15 @@ jobs:
         working-directory: code
         shell: pwsh
         run: |
-          wails build -platform windows/${{ matrix.goarch }} -trimpath -ldflags "-s -w" -nsis
+          wails build -platform windows/${{ matrix.goarch }} -trimpath -ldflags "-s -w"
           $VERSION = (Select-String -Path app.go -Pattern 'Version:\s*"v*([^"]*)"').Matches.Groups[1].Value
           echo "VERSION=$VERSION"
-          $installer = Get-ChildItem build/bin -Filter "*-installer.exe" | Select-Object -First 1
-          if ($installer) {
-            Rename-Item -Path $installer.FullName -NewName "ProcHub-${VERSION}-${{ matrix.goarch }}-installer.exe"
-          }
+          cd build/bin
+          # Standalone exe (versioned)
+          Copy-Item ProcHub.exe "ProcHub-${VERSION}-windows-${{ matrix.goarch }}.exe"
+          Write-Host "=== build/bin contents ==="
+          Get-ChildItem | Select-Object Name, Length
+          cd ../..
 
       - name: Build Release Files (macOS)
         if: runner.os == 'macOS'
@@ -247,7 +246,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: prochub-win-${{ matrix.goarch }}
-          path: code/build/bin/ProcHub-*-installer.exe
+          path: code/build/bin/ProcHub-*-windows-*.exe
 
       - name: Upload Artifact (macOS)
         if: runner.os == 'macOS'
@@ -279,7 +278,7 @@ jobs:
           assets: |
               code/ProcHub-*-linux-*.deb:apps/{random}.bin:{name}.deb
               code/ProcHub-*-linux-*.AppImage:apps/{random}.bin:{name}.AppImage
-              code/build/bin/ProcHub-*-installer.exe:apps/{random}.bin:{name}.exe
+              code/build/bin/ProcHub-*-windows-*.exe:apps/{random}.bin:{name}.exe
               code/ProcHub-*-darwin-*.dmg:apps/{random}.bin:{name}.dmg
 
       - name: Save OSS Downloads for Notify
