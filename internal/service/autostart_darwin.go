@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"prochub/internal/platform"
 )
 
 const launchAgentTemplate = `<?xml version="1.0" encoding="UTF-8"?>
@@ -85,8 +87,11 @@ func enableAutoStart(appName, displayName, appPath string) error {
 	}
 
 	// Create log directory
-	homeDir, _ := os.UserHomeDir()
-	logDir := filepath.Join(homeDir, "."+appName, "logs")
+	dataDir, err := platform.DataDir()
+	if err != nil {
+		return err
+	}
+	logDir := filepath.Join(dataDir, "logs")
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		return err
 	}

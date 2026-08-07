@@ -39,6 +39,7 @@ type App struct {
 	loggers      map[string]*ProcessLogger
 	autoStartMgr *service.AutoStartManager
 	systemLogger *logging.RollingStore
+	dataDir      string
 }
 
 // ProcessLogger holds the logger for a specific process
@@ -49,10 +50,10 @@ type ProcessLogger struct {
 
 // NewApp creates a new App application struct
 func NewApp() *App {
-	homeDir, _ := os.UserHomeDir()
-	dataDir := filepath.Join(homeDir, ".prochub")
+	dataDir := platform.MustDataDir()
 
 	return &App{
+		dataDir:      dataDir,
 		pm:           process.NewManager(),
 		store:        store.NewStore(dataDir),
 		logHub:       logging.NewStreamHub(100),
@@ -81,8 +82,7 @@ func (a *App) startup(ctx context.Context) {
 	if err != nil {
 		cfg = config.DefaultConfig()
 		// Initialize system logger first before logging errors
-		homeDir, _ := os.UserHomeDir()
-		systemLogDir := filepath.Join(homeDir, ".prochub", "system_logs")
+		systemLogDir := filepath.Join(a.dataDir, "system_logs")
 		os.MkdirAll(systemLogDir, 0755)
 		a.systemLogger = logging.NewRollingStore(systemLogDir, 1000, 10)
 		a.LogSystemError("startup", fmt.Sprintf("Failed to load config, using default: %v", err))
@@ -93,11 +93,10 @@ func (a *App) startup(ctx context.Context) {
 	if a.config.LogDir == "" {
 		a.config.LogDir = "logs"
 	}
-	homeDir, _ := os.UserHomeDir()
-	logDir := filepath.Join(homeDir, ".prochub", a.config.LogDir)
+	logDir := filepath.Join(a.dataDir, a.config.LogDir)
 	os.MkdirAll(logDir, 0755)
 	// Initialize system logger
-	systemLogDir := filepath.Join(homeDir, ".prochub", "system_logs")
+	systemLogDir := filepath.Join(a.dataDir, "system_logs")
 	os.MkdirAll(systemLogDir, 0755)
 	a.systemLogger = logging.NewRollingStore(systemLogDir, 1000, 10)
 	// Set up log callback for process manager
@@ -162,8 +161,7 @@ func (a *App) AddProcess(def process.Definition) error {
 	a.pm.Register(def)
 
 	// Create logger for this process
-	homeDir, _ := os.UserHomeDir()
-	logDir := filepath.Join(homeDir, ".prochub", a.config.LogDir, def.ID)
+	logDir := filepath.Join(a.dataDir, a.config.LogDir, def.ID)
 	a.loggers[def.ID] = &ProcessLogger{
 		store: logging.NewRollingStore(logDir, a.config.MaxLogLines, a.config.MaxLogFiles),
 		hub:   logging.NewStreamHub(100),
@@ -436,8 +434,11 @@ func (a *App) GetSystemLogs() (string, error) {
 	var logs strings.Builder
 	
 	// Collect application system logs
-	homeDir, _ := os.UserHomeDir()
-	systemLogDir := filepath.Join(homeDir, ".prochub", "system_logs")
+	dataDir := a.dataDir
+	if dataDir == "" {
+		dataDir = platform.MustDataDir()
+	}
+	systemLogDir := filepath.Join(dataDir, "system_logs")
 	
 	logs.WriteString("=== Application System Logs ===\n")
 	if entries, err := os.ReadDir(systemLogDir); err == nil {
