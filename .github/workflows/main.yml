@@ -277,7 +277,7 @@ jobs:
           key-secret: ${{ secrets.OSS_2_KEY_SECRET }}
           region: ${{ secrets.OSS_2_REGION }}
           bucket: ${{ secrets.OSS_2_BUCKET }}
-          callbackTitle: 📦ProcHub-${{ runner.os }}-打包成功
+          callbackTitle: 📦 ProcHub-${{ runner.os }}-打包成功
           callback: ${{ secrets.REPORT_URL_ME }}
           assets: |
               code/ProcHub-*-linux-*.deb:apps/{random}.bin:{name}.deb
