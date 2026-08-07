@@ -33,6 +33,9 @@ jobs:
           - name: win-x64
             os: windows-latest
             goarch: amd64
+          - name: win-arm64
+            os: windows-11-arm
+            goarch: arm64
 
     steps:
       - name: Checkout Code
