@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- 修复：`ProcessEditModal.vue` 使用 `FileSearch` 图标但未导入（测试拦截 Vue warn 时发现）
 - 新增：新增跨平台数据目录解析模块（`internal/platform/appdir`），统一将配置与日志存储至 `~/.prochub` 并自动创建目录
 - 优化：数据目录解析逻辑收敛至平台模块，兼容 macOS/Linux/Windows（含 HOME 环境变量缺失时的兜底处理）
 

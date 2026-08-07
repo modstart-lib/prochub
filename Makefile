@@ -48,6 +48,8 @@ build: check-deps
 build-devtools: check-deps
 	wails build -tags devtools
 
+# 
+
 # Clean build artifacts
 clean:
 	rm -rf build/bin

@@ -1,11 +1,12 @@
 <script lang="ts" setup>
 import { Button, Divider, Form, FormItem, Input, InputNumber, Modal, Popconfirm, Select, Switch, TabPane, Tabs, message } from 'ant-design-vue'
-import { Folder, FolderOpen, Minus, Plus, Settings2, Terminal, Trash2, Variable } from 'lucide-vue-next'
+import { FileSearch, Folder, FolderOpen, Minus, Plus, Settings2, Terminal, Trash2, Variable } from 'lucide-vue-next'
 import { reactive, ref, watch } from 'vue'
 import * as AppAPI from '../../../wailsjs/go/main/App'
 import { process as ProcessModels } from '../../../wailsjs/go/models'
 import { trackVisit } from '../../services/analytics'
 import { useAppStore, type ProcessItem } from '../../stores/app'
+import { testActionSet } from '../../utils/test'
 
 const props = defineProps<{ visible: boolean; process: ProcessItem | null }>()
 
@@ -174,6 +175,53 @@ const restartPolicyOptions = [
   { value: 'on_failure', label: 'On Failure' },
   { value: 'never', label: 'Never' },
 ]
+
+// ── 自动化测试 action ──────────────────────────────────────────────────────
+testActionSet('ProcessEdit.getForm', () => ({ ...form, env: form.env.map((e) => ({ ...e })) }))
+testActionSet('ProcessEdit.getTab', () => activeTab.value)
+testActionSet('ProcessEdit.setTab', (params: unknown) => {
+  const { tab } = params as { tab: string }
+  activeTab.value = tab as 'basic' | 'advanced' | 'env'
+})
+testActionSet('ProcessEdit.fill', (params: unknown) => {
+  const p = params as {
+    name?: string
+    command?: string
+    args?: string
+    workingDir?: string
+    autoStart?: boolean
+    restartPolicy?: string
+    maxRetries?: number
+    env?: Array<{ key: string; value: string }>
+  }
+  if (p.name !== undefined) form.name = p.name
+  if (p.command !== undefined) form.command = p.command
+  if (p.args !== undefined) form.args = p.args
+  if (p.workingDir !== undefined) form.workingDir = p.workingDir
+  if (p.autoStart !== undefined) form.autoStart = p.autoStart
+  if (p.restartPolicy !== undefined) form.restartPolicy = p.restartPolicy
+  if (p.maxRetries !== undefined) form.maxRetries = p.maxRetries
+  if (p.env !== undefined) {
+    form.env = p.env.length ? p.env.map((e) => ({ key: e.key, value: e.value })) : [{ key: '', value: '' }]
+  }
+})
+testActionSet('ProcessEdit.addEnv', (params: unknown) => {
+  const { times } = (params ?? {}) as { times?: number }
+  const n = Math.max(1, times ?? 1)
+  for (let i = 0; i < n; i++) addEnv()
+})
+testActionSet('ProcessEdit.getEnvCount', () => form.env.length)
+testActionSet('ProcessEdit.submit', async () => {
+  await handleOk()
+  return { visible: props.visible }
+})
+testActionSet('ProcessEdit.delete', async () => {
+  await handleDelete()
+  return { visible: props.visible }
+})
+testActionSet('ProcessEdit.cancel', () => {
+  emit('update:visible', false)
+})
 </script>
 
 <template>

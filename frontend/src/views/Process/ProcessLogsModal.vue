@@ -5,6 +5,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { SaveLogsToFile } from '../../../wailsjs/go/main/App';
 import { trackVisit } from '../../services/analytics';
 import { useAppStore } from '../../stores/app';
+import { testActionSet } from '../../utils/test';
 
 const props = defineProps<{ 
   visible: boolean
@@ -95,28 +96,50 @@ const getLogClass = (log: string) => {
 
 let refreshInterval: ReturnType<typeof setInterval> | null = null
 
-watch(
-  () => props.visible,
-  (next) => {
-    if (next) {
-      loadLogs()
-      // Refresh logs every 2 seconds while modal is open
-      refreshInterval = setInterval(() => {
-        if (props.visible) {
-          loadLogs()
+  watch(
+    () => props.visible,
+    (next) => {
+      if (next) {
+        loadLogs()
+        // Refresh logs every 2 seconds while modal is open
+        refreshInterval = setInterval(() => {
+          if (props.visible) {
+            loadLogs()
+          }
+        }, 2000)
+      } else {
+        if (refreshInterval) {
+          clearInterval(refreshInterval)
+          refreshInterval = null
         }
-      }, 2000)
-    } else {
-      if (refreshInterval) {
-        clearInterval(refreshInterval)
-        refreshInterval = null
+        logs.value = []
+        searchQuery.value = ''
+        showOnlyErrors.value = false
       }
-      logs.value = []
-      searchQuery.value = ''
-      showOnlyErrors.value = false
-    }
-  },
-)
+    },
+  )
+
+  // ── 自动化测试 action ───────────────────────────────────────────────────
+  testActionSet('ProcessLogs.getLogs', () => logs.value)
+  testActionSet('ProcessLogs.getFilteredCount', () => filteredLogs.value.length)
+  testActionSet('ProcessLogs.setSearch', (params: unknown) => {
+    searchQuery.value = (params as { query: string }).query
+  })
+  testActionSet('ProcessLogs.getSearch', () => searchQuery.value)
+  testActionSet('ProcessLogs.setErrorOnly', (params: unknown) => {
+    showOnlyErrors.value = (params as { enabled: boolean }).enabled
+  })
+  testActionSet('ProcessLogs.getErrorOnly', () => showOnlyErrors.value)
+  testActionSet('ProcessLogs.setAutoScroll', (params: unknown) => {
+    autoScroll.value = (params as { enabled: boolean }).enabled
+  })
+  testActionSet('ProcessLogs.refresh', async () => {
+    await loadLogs()
+  })
+  testActionSet('ProcessLogs.close', () => {
+    emit('update:visible', false)
+  })
+
 </script>
 
 <template>

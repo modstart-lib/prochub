@@ -1,8 +1,19 @@
 <script lang="ts" setup>
 import { AlertCircle, PlayCircle, StopCircle } from 'lucide-vue-next';
+import { onMounted, onUnmounted } from 'vue';
 import { useAppStore } from '../../stores/app';
+import { testActionSet, testActionUnset } from '../../utils/test';
 
 const appStore = useAppStore()
+
+onMounted(() => {
+  testActionSet('Process.getRunningCount', () => appStore.runningCount)
+  testActionSet('Process.getStoppedCount', () => appStore.stoppedCount)
+  testActionSet('Process.getFailedCount', () => appStore.failedCount)
+})
+onUnmounted(() => {
+  testActionUnset(['Process.getRunningCount', 'Process.getStoppedCount', 'Process.getFailedCount'])
+})
 </script>
 
 <template>

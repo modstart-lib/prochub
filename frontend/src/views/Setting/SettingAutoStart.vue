@@ -1,9 +1,10 @@
 <script lang="ts" setup>
 import { Switch } from 'ant-design-vue';
 import { Power } from 'lucide-vue-next';
-import { onMounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { GetAutoStartEnabled, SetAutoStartEnabled } from '../../../wailsjs/go/main/App';
 import { useAppStore } from '../../stores/app';
+import { testActionSet, testActionUnset } from '../../utils/test';
 
 const appStore = useAppStore()
 const autoStart = ref(false)
@@ -14,6 +15,17 @@ onMounted(async () => {
   } catch (e) {
     console.error('Failed to load auto-start status:', e)
   }
+
+  testActionSet('Setting.getAutoStart', () => autoStart.value)
+  testActionSet('Setting.setAutoStart', async (params: unknown) => {
+    const { enabled } = params as { enabled: boolean }
+    await toggleAutoStart(enabled)
+    return autoStart.value
+  })
+})
+
+onUnmounted(() => {
+  testActionUnset(['Setting.getAutoStart', 'Setting.setAutoStart'])
 })
 
 const toggleAutoStart = async (checked: boolean | string | number) => {

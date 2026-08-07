@@ -138,6 +138,9 @@ func (a *App) startup(ctx context.Context) {
 
 	// Log successful startup
 	a.LogSystemError("startup", fmt.Sprintf("Application started successfully, version: %s, platform: %s", appConfig.Version, a.autoStartMgr.GetPlatform()))
+
+	// Start automation test HTTP server (no-op without autotest build tag)
+	startAutotestServer(ctx, a)
 }
 
 // Greet returns a greeting for the given name
@@ -541,7 +544,7 @@ var appConfig = struct {
 	Name:            "ProcHub",
 	Title:           "ProcHub",
 	Slogan:          "Manage processes easily",
-	Version:         "0.5.0",
+	Version:         "0.6.0-beta",
 	Website:         baseURL,
 	WebsiteGithub:   "https://github.com/modstart-lib/prochub",
 	WebsiteGitee:    "https://gitee.com/modstart-lib/prochub",

@@ -1,8 +1,9 @@
 <script lang="ts" setup>
 import { RadioButton, RadioGroup } from 'ant-design-vue';
 import { Moon, Sun } from 'lucide-vue-next';
-import { computed } from 'vue';
+import { computed, onMounted, onUnmounted } from 'vue';
 import { useAppStore } from '../../stores/app';
+import { testActionSet, testActionUnset } from '../../utils/test';
 
 const appStore = useAppStore()
 
@@ -11,6 +12,17 @@ const themeMode = computed({
   set: (value: 'light' | 'dark') => {
     appStore.setTheme(value === 'dark')
   },
+})
+
+onMounted(() => {
+  testActionSet('Setting.getTheme', () => (appStore.isDark ? 'dark' : 'light'))
+  testActionSet('Setting.setTheme', (params: unknown) => {
+    const { theme } = params as { theme: 'light' | 'dark' }
+    appStore.setTheme(theme === 'dark')
+  })
+})
+onUnmounted(() => {
+  testActionUnset(['Setting.getTheme', 'Setting.setTheme'])
 })
 </script>
 

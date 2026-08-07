@@ -1,8 +1,9 @@
 <script lang="ts" setup>
 import { Select } from 'ant-design-vue';
 import { Globe, Languages } from 'lucide-vue-next';
-import { computed } from 'vue';
+import { computed, onMounted, onUnmounted } from 'vue';
 import { useAppStore } from '../../stores/app';
+import { testActionSet, testActionUnset } from '../../utils/test';
 
 const appStore = useAppStore()
 
@@ -17,6 +18,17 @@ const languageOptions = [
   { value: 'zh', label: '中文' },
   { value: 'en', label: 'English' },
 ]
+
+onMounted(() => {
+  testActionSet('Setting.getLocale', () => appStore.locale)
+  testActionSet('Setting.setLocale', (params: unknown) => {
+    const { locale: l } = params as { locale: 'zh' | 'en' }
+    appStore.setLocale(l)
+  })
+})
+onUnmounted(() => {
+  testActionUnset(['Setting.getLocale', 'Setting.setLocale'])
+})
 </script>
 
 <template>

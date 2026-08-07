@@ -7,6 +7,7 @@ import { useAppStore } from '../stores/app'
 import ProcessAddModal from '@/views/Process/ProcessAddModal.vue'
 import ProcessEditModal from '@/views/Process/ProcessEditModal.vue'
 import ProcessLogsModal from '@/views/Process/ProcessLogsModal.vue'
+import { testActionSet, testActionUnset } from '@/utils/test'
 
 const appStore = useAppStore()
 const showModal = ref(false)
@@ -38,6 +39,56 @@ onMounted(() => {
   setInterval(() => {
     appStore.loadProcesses()
   }, 3000)
+
+  // ── 自动化测试 action ───────────────────────────────────────────────────
+  testActionSet('Process.getCount', () => filteredProcesses.value.length)
+  testActionSet('Process.getTotalCount', () => appStore.processes.length)
+  testActionSet('Process.getProcesses', () => appStore.processes)
+  testActionSet('Process.getSearch', () => searchQuery.value)
+  testActionSet('Process.setSearch', (params: unknown) => {
+    searchQuery.value = (params as { query: string }).query
+  })
+  testActionSet('Process.addModal.show', () => { showModal.value = true })
+  testActionSet('Process.addModal.hide', () => { showModal.value = false })
+  testActionSet('Process.addModal.isVisible', () => showModal.value)
+  testActionSet('Process.editModal.isVisible', () => showEditModal.value)
+  testActionSet('Process.logsModal.isVisible', () => showLogsModal.value)
+  testActionSet('Process.editModal.show', (params: unknown) => {
+    const { id } = params as { id: string }
+    const found = appStore.processes.find((p) => p.id === id)
+    if (!found) throw new Error(`进程不存在: ${id}`)
+    editingProcess.value = found
+    showEditModal.value = true
+  })
+  testActionSet('Process.editModal.hide', () => { showEditModal.value = false })
+  testActionSet('Process.logsModal.show', (params: unknown) => {
+    const { id } = params as { id: string }
+    const found = appStore.processes.find((p) => p.id === id)
+    if (!found) throw new Error(`进程不存在: ${id}`)
+    logsProcess.value = found
+    showLogsModal.value = true
+  })
+  testActionSet('Process.logsModal.hide', () => { showLogsModal.value = false })
+  testActionSet('Process.start', async (params: unknown) => {
+    const { id } = params as { id: string }
+    await appStore.startProcess(id)
+  })
+  testActionSet('Process.stop', async (params: unknown) => {
+    const { id } = params as { id: string }
+    await appStore.stopProcess(id)
+  })
+  testActionSet('Process.restart', async (params: unknown) => {
+    const { id } = params as { id: string }
+    await appStore.restartProcess(id)
+  })
+  testActionSet('Process.setAutoStart', async (params: unknown) => {
+    const { id, enabled } = params as { id: string; enabled: boolean }
+    await appStore.setProcessAutoStart(id, enabled)
+  })
+  testActionSet('Process.remove', async (params: unknown) => {
+    const { id } = params as { id: string }
+    await appStore.removeProcess(id)
+  })
 })
 
 const getStatusConfig = (status: string) => {

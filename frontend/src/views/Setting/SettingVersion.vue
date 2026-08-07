@@ -1,9 +1,10 @@
 <script lang="ts" setup>
 import { Button } from 'ant-design-vue';
 import { RefreshCw } from 'lucide-vue-next';
-import { onMounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { checkVersionAndPrompt, getAppVersion, isAppStoreBuild } from '../../services/version';
 import { useAppStore } from '../../stores/app';
+import { testActionSet, testActionUnset } from '../../utils/test';
 
 const appStore = useAppStore()
 const appVersion = ref('')
@@ -11,6 +12,14 @@ const versionChecking = ref(false)
 
 onMounted(async () => {
   appVersion.value = await getAppVersion()
+
+  testActionSet('Setting.getVersion', () => appVersion.value)
+  testActionSet('Setting.getVersionChecking', () => versionChecking.value)
+  testActionSet('Setting.isAppStoreBuild', () => isAppStoreBuild)
+})
+
+onUnmounted(() => {
+  testActionUnset(['Setting.getVersion', 'Setting.getVersionChecking', 'Setting.isAppStoreBuild'])
 })
 
 const handleCheckVersion = async () => {
