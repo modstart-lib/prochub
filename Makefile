@@ -9,15 +9,18 @@ PROVISION_PROFILE   ?= $(HOME)/Library/MobileDevice/Provisioning\ Profiles/$(APP
 SIGN_IDENTITY        ?= "3rd Party Mac Developer Application"
 # Installer signing identity: "3rd Party Mac Developer Installer: Your Name (TEAMID)"
 INSTALLER_IDENTITY   ?= "3rd Party Mac Developer Installer"
+# Local signing identity for install (auto-detect Developer ID cert hash from Keychain, no Apple notarization)
+LOCAL_SIGN_IDENTITY  ?= $(shell security find-identity -v -p codesigning 2>/dev/null | awk '/Developer ID Application:/{print $$2; exit}')
 
 # 
-.PHONY: help dev build clean install check-deps
+.PHONY: help dev build clean install check-deps build-and-install
 
 # Default target
 help:
 	@echo "Available targets:"
 	@echo "  dev      - Start the development server"
 	@echo "  build    - Build the application"
+	@echo "  build-and-install - Build, sign locally (Developer ID, no notarization), install to /Applications"
 	@echo "  clean    - Clean build artifacts"
 	@echo "  install  - Install dependencies"
 	@echo "  check-deps - Check if required tools are installed"
@@ -57,10 +60,32 @@ clean:
 	rm -rf frontend/node_modules
 	go clean
 
-build_and_install:
+# Build the app, sign it locally (Developer ID cert if available, otherwise ad-hoc),
+# then install it into /Applications and launch. No Apple notarization is performed.
+build-and-install: check-deps
 	$(MAKE) install
 	$(MAKE) build
-	sudo rm -rfv /Applications/ProcHub.app
-	sudo cp -rv build/bin/ProcHub.app /Applications/ProcHub.app
+	@if [ -z "$(LOCAL_SIGN_IDENTITY)" ]; then \
+		echo ">>> No Developer ID certificate found, falling back to ad-hoc signing"; \
+		codesign --force --deep --sign - $(APP_PATH); \
+	else \
+		echo ">>> Signing $(APP_PATH) with '$(LOCAL_SIGN_IDENTITY)' (local only, no notarization)"; \
+		codesign --force --deep --sign "$(LOCAL_SIGN_IDENTITY)" $(APP_PATH); \
+	fi
+	codesign --verify --deep --strict --verbose=2 $(APP_PATH)
+	@echo ">>> Stopping running ProcHub instances"
+	pkill -f '/ProcHub.app' 2>/dev/null || true
+	@echo ">>> Installing to /Applications/ProcHub.app"
+	@rm -rf /Applications/ProcHub.app; \
+	if cp -R $(APP_PATH) /Applications/ProcHub.app; then \
+		echo ">>> Installed to /Applications/ProcHub.app (no sudo needed)"; \
+	else \
+		echo ">>> /Applications not writable by current user, retrying with sudo..."; \
+		sudo rm -rf /Applications/ProcHub.app; \
+		sudo cp -R $(APP_PATH) /Applications/ProcHub.app; \
+	fi
+	codesign --verify --deep --strict --verbose=2 /Applications/ProcHub.app
+	@echo ">>> Done. Launching ProcHub..."
+	open /Applications/ProcHub.app
 
 # 
