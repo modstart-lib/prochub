@@ -38,6 +38,7 @@ type App struct {
 	logHub       *logging.StreamHub
 	loggers      map[string]*ProcessLogger
 	autoStartMgr *service.AutoStartManager
+	wslMgr       *service.WSLManager
 	systemLogger *logging.RollingStore
 	dataDir      string
 }
@@ -59,6 +60,7 @@ func NewApp() *App {
 		logHub:       logging.NewStreamHub(100),
 		loggers:      make(map[string]*ProcessLogger),
 		autoStartMgr: service.NewAutoStartManager(AppName, AppDisplayName),
+		wslMgr:       service.NewWSLManager(),
 	}
 }
 
@@ -134,6 +136,11 @@ func (a *App) startup(ctx context.Context) {
 		if def.AutoStart {
 			go a.pm.Start(ctx, def.ID)
 		}
+	}
+
+	// Boot WSL on start-up when both app auto-start and WSL auto-start are enabled.
+	if a.config.AutoStartWSL {
+		go a.startWSLOnBoot()
 	}
 
 	// Log successful startup
@@ -358,9 +365,78 @@ func (a *App) GetAutoStartEnabled() (bool, error) {
 // SetAutoStartEnabled enables or disables auto-start
 func (a *App) SetAutoStartEnabled(enabled bool) error {
 	if enabled {
-		return a.autoStartMgr.Enable()
+		if err := a.autoStartMgr.Enable(); err != nil {
+			return err
+		}
+	} else {
+		if err := a.autoStartMgr.Disable(); err != nil {
+			return err
+		}
 	}
-	return a.autoStartMgr.Disable()
+
+	// Persist the flag so the WSL auto-start option can rely on it.
+	a.config.AutoStart = enabled
+	if err := a.store.Save(a.config); err != nil {
+		a.LogSystemError("SetAutoStartEnabled", fmt.Sprintf("Failed to save config: %v", err))
+		return err
+	}
+	return nil
+}
+
+// GetAutoStartWSLEnabled returns whether WSL should start together with the app.
+func (a *App) GetAutoStartWSLEnabled() bool {
+	return a.config.AutoStartWSL
+}
+
+// SetAutoStartWSLEnabled enables or disables starting WSL on boot. The option
+// only takes effect while the application auto-start option is enabled.
+func (a *App) SetAutoStartWSLEnabled(enabled bool) error {
+	a.config.AutoStartWSL = enabled
+	if err := a.store.Save(a.config); err != nil {
+		a.LogSystemError("SetAutoStartWSLEnabled", fmt.Sprintf("Failed to save config: %v", err))
+		return err
+	}
+	return nil
+}
+
+// GetWSLStatus returns the current WSL runtime status.
+func (a *App) GetWSLStatus() service.WSLStatus {
+	return a.wslMgr.Status()
+}
+
+// StartWSL boots the default WSL distribution.
+func (a *App) StartWSL() error {
+	if err := a.wslMgr.Start(); err != nil {
+		a.LogSystemError("StartWSL", fmt.Sprintf("Failed to start WSL: %v", err))
+		return err
+	}
+	return nil
+}
+
+// RestartWSL shuts down and boots the WSL subsystem again.
+func (a *App) RestartWSL() error {
+	if err := a.wslMgr.Restart(); err != nil {
+		a.LogSystemError("RestartWSL", fmt.Sprintf("Failed to restart WSL: %v", err))
+		return err
+	}
+	return nil
+}
+
+// startWSLOnBoot starts WSL when the app itself is registered for auto-start.
+// The WSL option only takes effect together with the app auto-start option.
+func (a *App) startWSLOnBoot() {
+	if a.wslMgr == nil {
+		return
+	}
+	enabled, err := a.autoStartMgr.IsEnabled()
+	if err != nil || !enabled {
+		return
+	}
+	if err := a.wslMgr.Start(); err != nil {
+		a.LogSystemError("wsl", fmt.Sprintf("Failed to auto-start WSL: %v", err))
+		return
+	}
+	a.LogSystemError("wsl", "WSL started automatically on boot")
 }
 
 // GetPlatform returns the current operating system

@@ -5,6 +5,7 @@ import "prochub/internal/process"
 type AppConfig struct {
 	Locale        string               `json:"locale"`
 	AutoStart     bool                 `json:"autoStart"`
+	AutoStartWSL  bool                 `json:"autoStartWSL"`
 	LogDir        string               `json:"logDir"`
 	MaxLogLines   int                  `json:"maxLogLines"`
 	MaxLogFiles   int                  `json:"maxLogFiles"`

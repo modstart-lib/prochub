@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- 新增：Windows 下设置页「开机自动启动」下方新增「自动启动WSL」子选项，仅当开启开机自动启动时生效；开启后会显示 WSL 运行状态（运行中/已停止/未安装）并支持「开启」「重启」操作，应用随开机启动时自动拉起 WSL
+- 修复：Windows 下调用 `wsl.exe` 不再弹出黑色控制台窗口（`CREATE_NO_WINDOW`）；启动 WSL 改为用登录 shell（`/bin/bash -l -i`）拉起并持有常驻，确保 `/etc/profile`、`~/.profile`、`~/.bashrc` 生效（环境与命令行 `wsl` 一致），并新增「启动中」状态以覆盖 WSL 冷启动耗时较长的情况
+- 新增：新增 `make update-version VERSION=x.y.z` 命令（`scripts/update-version.sh`），一键同步更新 `app.go`、根/前端 `package.json`、两个 `package-lock.json`、`tests/screenshot.ts` 中的版本号，支持 `x.y.z` 及 `x.y.z-beta` 格式并校验非法输入
 - 新增：数据目录支持 `PROCHUB_DATA_ROOT` 环境变量覆盖（优先级最高，支持 `~/` 展开），并新增 `~/.prochub/client.json` 的 `dataRoot` 字段（默认 `~/.prochub/data`）作为第二优先级；正式安装版可通过 macOS Info.plist 的 `LSEnvironment` 注入，实现正式使用数据与开发测试完全隔离
 - 修复：`make dev-seed-test` 进程清理由 `pkill -f ProcHub` 改为精确匹配 `build/bin/ProcHub`，避免误杀已安装的正式版 ProcHub.app；测试启动前强制清除 `PROCHUB_DATA_ROOT`，确保种子数据只写入默认目录
 - 修复：`ProcessEditModal.vue` 使用 `FileSearch` 图标但未导入（测试拦截 Vue warn 时发现）

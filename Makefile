@@ -13,7 +13,7 @@ INSTALLER_IDENTITY   ?= "3rd Party Mac Developer Installer"
 LOCAL_SIGN_IDENTITY  ?= $(shell security find-identity -v -p codesigning 2>/dev/null | awk '/Developer ID Application:/{print $$2; exit}')
 
 # 
-.PHONY: help dev build clean install check-deps build-and-install
+.PHONY: help dev build clean install check-deps build-and-install update-version
 
 # Default target
 help:
@@ -24,6 +24,7 @@ help:
 	@echo "  clean    - Clean build artifacts"
 	@echo "  install  - Install dependencies"
 	@echo "  check-deps - Check if required tools are installed"
+	@echo "  update-version - Update version across all sources (make update-version VERSION=0.7.0)"
 
 # Check if required tools are installed
 check-deps:
@@ -52,6 +53,12 @@ build-devtools: check-deps
 	wails build -tags devtools
 
 # 
+
+# Update version across all sources (app.go, package.json, package-lock.json, screenshot mock)
+# Usage: make update-version VERSION=0.7.0
+update-version:
+	@test -n "$(VERSION)" || { echo "Usage: make update-version VERSION=0.7.0"; exit 1; }
+	bash scripts/update-version.sh "$(VERSION)"
 
 # Clean build artifacts
 clean:
