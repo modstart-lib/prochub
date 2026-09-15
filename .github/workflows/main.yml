@@ -317,16 +317,13 @@ jobs:
           pattern: prochub-*
           path: _artifacts
           merge-multiple: false
-      - name: Upload to Snapshot Release (with overwrite)
+      - name: Recreate Snapshot Release (fresh, latest)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Ensure vsnapshot release exists (create if not)
-          gh release create vsnapshot \
-            --title "Snapshot" \
-            --notes "Latest build from main branch" \
-            --prerelease \
-            2>/dev/null || true
+          # Always drop the previous snapshot (and its tag) so nothing is reused
+          echo "=== Removing previous vsnapshot release ==="
+          gh release delete vsnapshot --yes --cleanup-tag 2>/dev/null || true
           # Copy artifacts to temp dir with version replaced by "snapshot"
           tmpdir=$(mktemp -d)
           echo "=== Downloaded artifacts ==="
@@ -338,10 +335,16 @@ jobs:
             cp "$f" "$tmpdir/$clean"
             echo "Staged: $base -> $clean"
           done
+          # Create a brand new snapshot release and mark it as latest
+          echo "=== Creating fresh vsnapshot release ==="
+          gh release create vsnapshot \
+            --title "Snapshot" \
+            --notes "Latest build from main branch" \
+            --latest
           echo "=== Uploading to vsnapshot ==="
           for f in "$tmpdir"/*; do
             echo "Uploading: $(basename "$f")"
-            gh release upload vsnapshot "$f" --clobber
+            gh release upload vsnapshot "$f"
           done
           rm -rf "$tmpdir"
 
