@@ -92,6 +92,8 @@ export default {
     processRemoved: '进程已删除',
     operationFailed: '操作失败',
     confirmDelete: '确定要删除此进程吗？',
+    quitBlockedTitle: '无法退出',
+    quitBlocked: '仍有 {count} 个进程正在运行：{names}。请先停止所有进程后再退出。',
   },
   logs: {
     title: '日志流',

@@ -1,9 +1,9 @@
 <script lang="ts" setup>
-import { ConfigProvider, theme } from 'ant-design-vue'
+import { ConfigProvider, Modal, theme } from 'ant-design-vue'
 import enUS from 'ant-design-vue/es/locale/en_US'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
 import { Cpu, Settings } from 'lucide-vue-next'
-import { computed, getCurrentInstance, onMounted, ref } from 'vue'
+import { computed, getCurrentInstance, onMounted, onUnmounted, ref } from 'vue'
 import AppLogo from './components/AppLogo.vue'
 import ProcessDashboardSummary from './views/Process/ProcessDashboardSummary.vue'
 import ProcessList from './views/Process.vue'
@@ -11,13 +11,26 @@ import SettingsPage from './views/Setting.vue'
 import { trackVisit } from './services/analytics'
 import { autoCheckVersion, isAppStoreBuild } from './services/version'
 import { useAppStore } from './stores/app'
-import { initTestRegistry, registerNavigate, reportTestError, reportTestWarn, testActionSet } from './utils/test'
+import { initTestRegistry, registerNavigate, reportTestError, reportTestWarn, testActionSet, testActionUnset } from './utils/test'
 import { EventsEmit, EventsOff, EventsOn } from '../wailsjs/runtime/runtime'
 
 const appStore = useAppStore()
 
 // Active tab state
 const activeTab = ref('processes')
+
+// Quit-blocked warning (shown when the tray quit is blocked by running processes)
+const quitBlockedVisible = ref(false)
+const quitBlockedMessage = ref('')
+
+// onQuitBlocked shows the warning that prevents quitting while processes run
+const onQuitBlocked = (data: { count: number; names: string[] }) => {
+  quitBlockedVisible.value = true
+  quitBlockedMessage.value = appStore.t('messages.quitBlocked', {
+    count: data.count,
+    names: (data.names || []).join('、'),
+  })
+}
 
 // Track main page visit on mount
 onMounted(async () => {
@@ -100,6 +113,16 @@ onMounted(async () => {
     el.click()
     return true
   })
+  testActionSet('App.quitBlocked.isVisible', () => quitBlockedVisible.value)
+  testActionSet('App.quitBlocked.getMessage', () => quitBlockedMessage.value)
+  testActionSet('App.quitBlocked.simulate', (params: unknown) => {
+    onQuitBlocked(params as { count: number; names: string[] })
+    return true
+  })
+  testActionSet('App.quitBlocked.hide', () => {
+    quitBlockedVisible.value = false
+    return true
+  })
 
   // 监听来自 Go 后端的调用请求（由 HTTP /auto ui-call 转发过来）
   EventsOn('autotest:call', async (data: { id: string; name: string; params: unknown }) => {
@@ -110,6 +133,20 @@ onMounted(async () => {
       EventsEmit('autotest:result:' + data.id, { error: (e as Error)?.message || String(e) })
     }
   })
+
+  // 托盘退出被阻止时（仍有进程在运行）弹出提示，且不退出应用
+  EventsOn('app:quitBlocked', onQuitBlocked)
+})
+
+onUnmounted(() => {
+  EventsOff('autotest:call')
+  EventsOff('app:quitBlocked')
+  testActionUnset([
+    'App.quitBlocked.isVisible',
+    'App.quitBlocked.getMessage',
+    'App.quitBlocked.simulate',
+    'App.quitBlocked.hide',
+  ])
 })
 
 const antLocale = computed(() => {
@@ -171,5 +208,16 @@ const themeConfig = computed(() => ({
         </div>
       </div>
     </div>
+
+    <!-- 托盘退出被阻止：仍有进程在运行 -->
+    <Modal
+      :open="quitBlockedVisible"
+      :title="appStore.t('messages.quitBlockedTitle')"
+      :footer="null"
+      :width="'min(420px, 90vw)'"
+      @cancel="quitBlockedVisible = false"
+    >
+      <p class="text-sm leading-relaxed">{{ quitBlockedMessage }}</p>
+    </Modal>
   </ConfigProvider>
 </template>

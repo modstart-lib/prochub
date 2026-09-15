@@ -132,6 +132,25 @@ func (m *Manager) Get(id string) (Snapshot, error) {
 	}, nil
 }
 
+// RunningNames returns the names of all processes that are currently running
+// or starting. It is used to block quitting while processes are still active.
+func (m *Manager) RunningNames() []string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	names := make([]string, 0, len(m.entries))
+	for _, item := range m.entries {
+		if item.status == StatusRunning || item.status == StatusStarting {
+			name := item.definition.Name
+			if name == "" {
+				name = item.definition.ID
+			}
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
 // StopAll stops all running processes
 func (m *Manager) StopAll() {
 	m.mu.RLock()

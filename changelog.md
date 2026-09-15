@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- 修复：托盘菜单「退出」无法真正退出应用（图标消失但进程残留）：新增 quitting 标志区分「关闭窗口=隐藏」与「真正退出」，退出时 `OnBeforeClose` 不再拦截关闭，应用可正常退出
+- 新增：托盘退出时若仍有进程在运行则阻止退出，自动显示窗口并在界面弹出提示（列出运行中的进程名），需先手动停止全部进程后才能退出；`QuitApp` 采用相同策略
 - 新增：Windows 下设置页「开机自动启动」下方新增「自动启动WSL」子选项，仅当开启开机自动启动时生效；开启后会显示 WSL 运行状态（运行中/已停止/未安装）并支持「开启」「重启」操作，应用随开机启动时自动拉起 WSL
 - 修复：Windows 下调用 `wsl.exe` 不再弹出黑色控制台窗口（`CREATE_NO_WINDOW`）；启动 WSL 改为用登录 shell（`/bin/bash -l -i`）拉起并持有常驻，确保 `/etc/profile`、`~/.profile`、`~/.bashrc` 生效（环境与命令行 `wsl` 一致），并新增「启动中」状态以覆盖 WSL 冷启动耗时较长的情况
 - 新增：新增 `make update-version VERSION=x.y.z` 命令（`scripts/update-version.sh`），一键同步更新 `app.go`、根/前端 `package.json`、两个 `package-lock.json`、`tests/screenshot.ts` 中的版本号，支持 `x.y.z` 及 `x.y.z-beta` 格式并校验非法输入

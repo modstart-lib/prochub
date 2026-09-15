@@ -800,8 +800,40 @@ func (a *App) HideWindow() {
 	platform.HideDockIcon()
 }
 
-// QuitApp quits the application
+// PrepareQuit marks the application as quitting so the window close handler
+// stops preventing the close. Implements platform.AppRef.
+func (a *App) PrepareQuit() {
+	SetQuitting(true)
+}
+
+// RunningProcessNames returns the names of processes that are still running or
+// starting. Implements platform.AppRef.
+func (a *App) RunningProcessNames() []string {
+	return a.pm.RunningNames()
+}
+
+// NotifyQuitBlocked tells the frontend that quitting was blocked because some
+// processes are still running. Implements platform.AppRef.
+func (a *App) NotifyQuitBlocked(names []string) {
+	if a.ctx == nil {
+		return
+	}
+	runtime.EventsEmit(a.ctx, "app:quitBlocked", map[string]interface{}{
+		"count": len(names),
+		"names": names,
+	})
+}
+
+// QuitApp quits the application. Quitting is blocked while any process is still
+// running: the window is shown and the frontend displays a warning instead.
 func (a *App) QuitApp() {
+	if names := a.pm.RunningNames(); len(names) > 0 {
+		runtime.WindowShow(a.ctx)
+		a.NotifyQuitBlocked(names)
+		return
+	}
+
+	SetQuitting(true)
 	runtime.Quit(a.ctx)
 }
 

@@ -92,6 +92,8 @@ export default {
     processRemoved: 'Process removed successfully',
     operationFailed: 'Operation failed',
     confirmDelete: 'Are you sure you want to delete this process?',
+    quitBlockedTitle: 'Cannot quit',
+    quitBlocked: '{count} process(es) are still running: {names}. Please stop all processes before quitting.',
   },
   logs: {
     title: 'Streaming Logs',

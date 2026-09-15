@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	goruntime "runtime"
+	"sync/atomic"
 
 	"prochub/internal/platform"
 
@@ -33,6 +34,17 @@ var trayIconWindows []byte
 // Global app reference for tray menu callbacks
 var globalApp *App
 var trayManager *platform.TrayManager
+
+// quitting is set to true when the application is really quitting.
+// The window close button only hides the window, so OnBeforeClose must
+// allow the close to proceed when this flag is set (tray quit / QuitApp).
+var quitting atomic.Bool
+
+// SetQuitting marks the application as quitting so that OnBeforeClose
+// stops preventing the window close.
+func SetQuitting(v bool) {
+	quitting.Store(v)
+}
 
 // UpdateTrayLanguage updates the system tray menu language
 func UpdateTrayLanguage() {
@@ -122,8 +134,13 @@ func main() {
 		CSSDragValue:             "drag",
 		CSSDragProperty:          "--wails-draggable",
 
-		// Custom close behavior: hide window and Dock icon instead of quitting
+		// Custom close behavior: hide window and Dock icon instead of quitting.
+		// When the user really quits (tray menu / QuitApp), the quitting flag
+		// is set first so the close is allowed to proceed and the app exits.
 		OnBeforeClose: func(ctx context.Context) (prevent bool) {
+			if quitting.Load() {
+				return false
+			}
 			// Hide the window
 			runtime.WindowHide(ctx)
 			// Hide Dock icon on macOS

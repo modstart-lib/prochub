@@ -15,6 +15,15 @@ import (
 type AppRef interface {
 	GetLocale() string
 	GetCtx() context.Context
+	// PrepareQuit marks the app as quitting so the window close handler
+	// allows the app to exit instead of only hiding the window.
+	PrepareQuit()
+	// RunningProcessNames returns the names of processes that are still
+	// running. Quitting is blocked while this list is not empty.
+	RunningProcessNames() []string
+	// NotifyQuitBlocked informs the frontend that the quit was blocked
+	// because some processes are still running.
+	NotifyQuitBlocked(names []string)
 }
 
 // TrayManager manages the system tray icon and menu
@@ -134,10 +143,30 @@ func (t *TrayManager) showWindow() {
 	}
 }
 
-// quitApp properly quits the application
+// quitApp quits the application, but only when every managed process has been
+// stopped. If any process is still running the quit is blocked: the window is
+// shown and the frontend displays a warning telling the user to stop the
+// processes first. This prevents silently killing or leaking running jobs.
 func (t *TrayManager) quitApp() {
-	if t.app != nil && t.app.GetCtx() != nil {
+	if t.app == nil {
+		systray.Quit()
+		return
+	}
+
+	// Block quitting while processes are still running.
+	if names := t.app.RunningProcessNames(); len(names) > 0 {
+		// Bring the window back so the user can see the warning.
+		t.showWindow()
+		t.app.NotifyQuitBlocked(names)
+		return
+	}
+
+	// Allow the window close handler to proceed (instead of only hiding).
+	t.app.PrepareQuit()
+
+	if t.app.GetCtx() != nil {
 		runtime.Quit(t.app.GetCtx())
+		return
 	}
 	systray.Quit()
 }
