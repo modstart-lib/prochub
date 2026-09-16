@@ -190,14 +190,8 @@ func main() {
 			UniqueId: "prochub-app-unique-id",
 			OnSecondInstanceLaunch: func(secondInstanceData options.SecondInstanceData) {
 				if globalApp != nil && globalApp.ctx != nil {
-					// Show Dock icon first (macOS)
-					platform.ShowDockIcon()
-					// Show the window
-					runtime.WindowShow(globalApp.ctx)
-					if goruntime.GOOS == "darwin" {
-						runtime.WindowSetAlwaysOnTop(globalApp.ctx, true)
-						runtime.WindowSetAlwaysOnTop(globalApp.ctx, false)
-					}
+					// Restore and show the window (also restores the macOS Dock icon)
+					platform.ShowMainWindow(globalApp.ctx)
 				}
 			},
 		},

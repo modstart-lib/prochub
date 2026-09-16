@@ -785,12 +785,9 @@ func (a *App) SaveLogsToFile(processName string, content string) error {
 	return os.WriteFile(filePath, []byte(content), 0644)
 }
 
-// ShowWindow shows the main window (used by system tray)
+// ShowWindow shows the main window (used by the frontend)
 func (a *App) ShowWindow() {
-	runtime.WindowShow(a.ctx)
-	runtime.WindowUnminimise(a.ctx)
-	runtime.WindowSetAlwaysOnTop(a.ctx, true)
-	runtime.WindowSetAlwaysOnTop(a.ctx, false)
+	platform.ShowMainWindow(a.ctx)
 }
 
 // HideWindow hides the main window and Dock icon
@@ -828,7 +825,7 @@ func (a *App) NotifyQuitBlocked(names []string) {
 // running: the window is shown and the frontend displays a warning instead.
 func (a *App) QuitApp() {
 	if names := a.pm.RunningNames(); len(names) > 0 {
-		runtime.WindowShow(a.ctx)
+		platform.ShowMainWindow(a.ctx)
 		a.NotifyQuitBlocked(names)
 		return
 	}

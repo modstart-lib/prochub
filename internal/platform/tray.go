@@ -101,6 +101,13 @@ func (t *TrayManager) onReady() {
 	}
 	systray.SetTooltip("ProcHub - Process Manager")
 
+	// On Windows a left click on the tray icon shows the main window while a
+	// right click shows the context menu (the systray default). On other
+	// platforms the left click keeps the default behavior (show the menu).
+	if goruntime.GOOS == "windows" {
+		systray.SetOnTapped(t.showWindow)
+	}
+
 	// Get labels based on app configuration
 	showLabel, quitLabel := t.getLocalizedLabels()
 
@@ -128,19 +135,29 @@ func (t *TrayManager) onExit() {
 	// Cleanup if needed
 }
 
+// ShowMainWindow restores and shows the main window, and brings it to the
+// foreground. It also restores the Dock icon on macOS. A window hidden with
+// SW_HIDE is not brought back by SW_SHOW alone (Wails' WindowShow uses
+// SW_SHOW), so on Windows restoreMainWindowNative() issues SW_RESTORE on the
+// real HWND first; WindowUnminimise then handles the minimized state.
+func ShowMainWindow(ctx context.Context) {
+	if ctx == nil {
+		return
+	}
+	restoreMainWindowNative()
+	ShowDockIcon()
+	runtime.WindowUnminimise(ctx)
+	runtime.WindowShow(ctx)
+	runtime.WindowSetAlwaysOnTop(ctx, true)
+	runtime.WindowSetAlwaysOnTop(ctx, false)
+}
+
 // showWindow shows the main application window and Dock icon
 func (t *TrayManager) showWindow() {
-	if t.app != nil && t.app.GetCtx() != nil {
-		// Show Dock icon first (macOS)
-		ShowDockIcon()
-		// Then show the window
-		runtime.WindowShow(t.app.GetCtx())
-		// On macOS, bring window to front
-		if goruntime.GOOS == "darwin" {
-			runtime.WindowSetAlwaysOnTop(t.app.GetCtx(), true)
-			runtime.WindowSetAlwaysOnTop(t.app.GetCtx(), false)
-		}
+	if t.app == nil {
+		return
 	}
+	ShowMainWindow(t.app.GetCtx())
 }
 
 // quitApp quits the application, but only when every managed process has been
