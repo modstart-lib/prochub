@@ -1,15 +1,15 @@
 <script lang="ts" setup>
-import { Divider } from 'ant-design-vue';
 import { onMounted } from 'vue';
 import { trackVisit } from '../services/analytics';
-import { isAppStoreBuild } from '../services/version';
 import { useAppStore } from '../stores/app';
 import SettingAbout from './Setting/SettingAbout.vue';
 import SettingAutoStart from './Setting/SettingAutoStart.vue';
 import SettingDataDir from './Setting/SettingDataDir.vue';
+import SettingGroup from './Setting/SettingGroup.vue';
 import SettingLanguage from './Setting/SettingLanguage.vue';
 import SettingTheme from './Setting/SettingTheme.vue';
 import SettingVersion from './Setting/SettingVersion.vue';
+import SettingWSL from './Setting/SettingWSL.vue';
 
 const appStore = useAppStore()
 
@@ -25,16 +25,22 @@ onMounted(() => {
     </div>
 
     <div class="settings-content">
-      <SettingTheme />
-      <Divider class="section-divider" />
-      <SettingLanguage />
-      <Divider class="section-divider" />
-      <SettingAutoStart />
-      <Divider v-if="!isAppStoreBuild" class="section-divider" />
-      <SettingVersion />
-      <SettingDataDir />
-      <Divider class="section-divider" />
-      <SettingAbout />
+      <SettingGroup :title="appStore.t('settings.group.appearance')">
+        <SettingTheme />
+        <SettingLanguage />
+      </SettingGroup>
+
+      <SettingGroup :title="appStore.t('settings.group.startup')">
+        <SettingAutoStart />
+      </SettingGroup>
+
+      <SettingWSL />
+
+      <SettingGroup :title="appStore.t('settings.group.general')">
+        <SettingVersion />
+        <SettingDataDir />
+        <SettingAbout />
+      </SettingGroup>
     </div>
   </div>
 </template>
@@ -53,10 +59,6 @@ onMounted(() => {
 }
 
 .settings-content {
-  @apply flex flex-col pt-2;
-}
-
-.section-divider {
-  @apply my-2;
+  @apply flex flex-col gap-6 pt-4;
 }
 </style>

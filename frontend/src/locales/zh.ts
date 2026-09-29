@@ -128,6 +128,12 @@ export default {
     about: '关于',
     aboutDesc: 'ProcHub - 跨平台进程管理工具',
     feedback: '工单反馈',
+    group: {
+      appearance: '外观',
+      startup: '启动',
+      wsl: 'Windows 子系统（WSL）',
+      general: '通用',
+    },
     theme: {
       title: '主题',
       desc: '选择您喜欢的主题',
@@ -141,9 +147,9 @@ export default {
     },
     wsl: {
       title: 'WSL',
-      desc: '查看 WSL 运行状态并手动启停（仅 Windows）',
-      autoStartTitle: '开机时自动启动 WSL',
-      autoStartDesc: '系统启动时自动启动 WSL，与应用自身的开机自启相互独立',
+      desc: '查看运行状态并手动启停',
+      autoStartTitle: 'WSL 开机自启',
+      autoStartDesc: '系统启动时自动启动 WSL，无需开启 ProcHub 自启',
       statusRunning: '运行中',
       statusStarting: '启动中',
       statusStopped: '已停止',

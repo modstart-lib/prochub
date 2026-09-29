@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { Button, Divider } from 'ant-design-vue';
+import { Button } from 'ant-design-vue';
 import { FolderOpen } from 'lucide-vue-next';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { GetDataDirInfo, OpenDataDir } from '../../../wailsjs/go/main/App';
@@ -40,32 +40,26 @@ const doOpenDataDir = async () => {
 </script>
 
 <template>
-  <template v-if="!isDefault">
-    <Divider class="section-divider" />
-    <SettingSection
-      class="datadir-section"
-      :title="appStore.t('settings.dataDir.title')"
-      :desc="appStore.t('settings.dataDir.desc')"
-    >
-      <template #icon>
-        <FolderOpen class="w-5 h-5" aria-hidden="true" />
-      </template>
-      <template #control>
-        <span class="data-dir-path" :title="dataDir">{{ dataDir }}</span>
-        <Button type="primary" @click="doOpenDataDir">
-          <template #icon><FolderOpen class="w-4 h-4" aria-hidden="true" /></template>
-          {{ appStore.t('settings.dataDir.open') }}
-        </Button>
-      </template>
-    </SettingSection>
-  </template>
+  <SettingSection
+    v-if="!isDefault"
+    class="datadir-section"
+    :title="appStore.t('settings.dataDir.title')"
+    :desc="appStore.t('settings.dataDir.desc')"
+  >
+    <template #icon>
+      <FolderOpen class="w-5 h-5" aria-hidden="true" />
+    </template>
+    <template #control>
+      <span class="data-dir-path" :title="dataDir">{{ dataDir }}</span>
+      <Button type="primary" @click="doOpenDataDir">
+        <template #icon><FolderOpen class="w-4 h-4" aria-hidden="true" /></template>
+        {{ appStore.t('settings.dataDir.open') }}
+      </Button>
+    </template>
+  </SettingSection>
 </template>
 
 <style scoped>
-.section-divider {
-  @apply my-2;
-}
-
 .data-dir-path {
   @apply max-w-[40vw] truncate text-xs text-slate-500 dark:text-slate-400;
 }

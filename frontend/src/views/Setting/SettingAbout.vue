@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { Button, Modal } from 'ant-design-vue';
-import { Globe, Info, MessageSquare } from 'lucide-vue-next';
+import { Github, Info, MessageSquare } from 'lucide-vue-next';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { GetAppConfig, GetAppName, GetPlatform, GetProcessLogs, GetSystemLogs, GetSystemVersion, ListProcesses } from '../../../wailsjs/go/main/App';
 import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime';
@@ -109,7 +109,7 @@ const handleFeedbackMessage = async (event: MessageEvent) => {
     </template>
     <template #control>
       <Button aria-label="GitHub" @click="openGithub">
-        <template #icon><Globe class="w-4 h-4" aria-hidden="true" /></template>
+        <template #icon><Github class="w-4 h-4" aria-hidden="true" /></template>
         GitHub
       </Button>
       <Button v-if="feedbackUrl" type="primary" @click="showFeedbackModal = true">

@@ -2,6 +2,10 @@
 
 ## [unreleased]
 
+- 优化：设置页改为分组布局（外观 / 启动 / Windows 子系统（WSL）/ 通用）并新增 `SettingGroup` 分组标题组件，消除 WSL 项被缩进成「开机自动启动」子项的层级误导
+- 优化：WSL 拆分出独立 `SettingWSL.vue`，启停按钮按状态动态显示（运行中只给「停止/重启」、已停止只给「启动/重启」），移除无意义的禁用按钮占位
+- 优化：两个开机自启开关通过分组与图标区分——ProcHub 自启改用 Rocket 图标，「WSL 开机自启」归入 WSL 分组并简化文案
+- 修复：设置页「关于」GitHub 按钮图标由 `Globe`（易误解为官网）改为 `Github`
 - 新增：设置页在生效数据目录非默认（`PROCHUB_DATA_ROOT` 或 `client.json` 的 `dataRoot` 覆盖）时，显示实际运行路径并支持一键打开定位到该目录
 - 新增：新增 `DESIGN.md` 设计规范，统一颜色令牌、圆角、间距、字体、组件与深色模式约定
 - 优化：深色模式改由 `ConfigProvider` 主题统一驱动，移除 `style.css` 中 30 余条 `.dark .ant-* !important` 双重覆盖，深色主色统一为 `#34d399`

@@ -128,6 +128,12 @@ export default {
     about: 'About',
     aboutDesc: 'ProcHub - cross-platform process manager',
     feedback: 'Feedback',
+    group: {
+      appearance: 'Appearance',
+      startup: 'Startup',
+      wsl: 'Windows Subsystem (WSL)',
+      general: 'General',
+    },
     theme: {
       title: 'Theme',
       desc: 'Choose your preferred theme',
@@ -141,9 +147,9 @@ export default {
     },
     wsl: {
       title: 'WSL',
-      desc: 'View WSL status and start/stop it manually (Windows only)',
-      autoStartTitle: 'Start WSL at Boot',
-      autoStartDesc: 'Start WSL when the system boots, independent of the app auto-start',
+      desc: 'View status and start/stop manually',
+      autoStartTitle: 'Launch WSL at Boot',
+      autoStartDesc: 'Start WSL at boot; ProcHub auto-start is not required',
       statusRunning: 'Running',
       statusStarting: 'Starting',
       statusStopped: 'Stopped',
