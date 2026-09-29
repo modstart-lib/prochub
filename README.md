@@ -77,12 +77,20 @@ prochub config set theme light|dark        # set the light/dark theme
 prochub config set language zh|en          # set the UI language
 prochub config set autostart on|off        # toggle auto-start on boot
 prochub config set autostart-wsl on|off    # toggle auto-starting WSL on boot
+prochub wsl status                         # show WSL runtime status
+prochub wsl start                          # start WSL
+prochub wsl stop                           # stop WSL
+prochub wsl restart                        # restart WSL
 prochub status                             # show app status
 prochub version                            # show the version
 ```
 
 Process log files are stored under the data directory (`<dataDir>/<logDir>/<id>`),
 so `logs` also works while the GUI is open.
+
+`autostart-wsl` only controls whether WSL is started automatically at boot. It is
+independent from the app's own auto-start setting and does not affect the manual
+`wsl start` / `wsl stop` commands.
 
 ## Build
 

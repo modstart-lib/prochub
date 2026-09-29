@@ -86,6 +86,28 @@ func (c *Client) UpdateConfig(patch ConfigPatch) error {
 	return c.do(http.MethodPost, "/control/config", patch, nil)
 }
 
+// WSLStatus returns the WSL runtime status.
+func (c *Client) WSLStatus() (WSLStatusInfo, error) {
+	var out WSLStatusInfo
+	err := c.do(http.MethodGet, "/control/wsl", nil, &out)
+	return out, err
+}
+
+// StartWSL boots the default WSL distribution.
+func (c *Client) StartWSL() error {
+	return c.do(http.MethodPost, "/control/wsl/start", nil, nil)
+}
+
+// StopWSL shuts down the whole WSL subsystem.
+func (c *Client) StopWSL() error {
+	return c.do(http.MethodPost, "/control/wsl/stop", nil, nil)
+}
+
+// RestartWSL shuts down and boots the WSL subsystem again.
+func (c *Client) RestartWSL() error {
+	return c.do(http.MethodPost, "/control/wsl/restart", nil, nil)
+}
+
 func (c *Client) do(method, path string, body interface{}, out interface{}) error {
 	var reader io.Reader
 	if body != nil {

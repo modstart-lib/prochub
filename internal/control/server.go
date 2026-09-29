@@ -52,6 +52,16 @@ type ConfigPatch struct {
 	AutoStartWSL *bool   `json:"autoStartWSL"`
 }
 
+// WSLStatusInfo is the subset of the WSL runtime state exposed to the CLI.
+type WSLStatusInfo struct {
+	Supported bool   `json:"supported"`
+	Available bool   `json:"available"`
+	Running   bool   `json:"running"`
+	Starting  bool   `json:"starting"`
+	Version   string `json:"version"`
+	Distro    string `json:"distro"`
+}
+
 // Backend is implemented by the application to serve control requests.
 type Backend interface {
 	Status() StatusInfo
@@ -61,6 +71,10 @@ type Backend interface {
 	Logs(id string, tail int) ([]string, error)
 	Config() ConfigSummary
 	UpdateConfig(patch ConfigPatch) error
+	WSLStatus() WSLStatusInfo
+	StartWSL() error
+	StopWSL() error
+	RestartWSL() error
 }
 
 // Server is the local HTTP control server embedded in the running application.
@@ -99,6 +113,10 @@ func (s *Server) Start() (int, error) {
 	mux.HandleFunc("GET /control/processes/{id}/logs", s.handleLogs)
 	mux.HandleFunc("GET /control/config", s.handleConfigGet)
 	mux.HandleFunc("POST /control/config", s.handleConfigPatch)
+	mux.HandleFunc("GET /control/wsl", s.handleWSLStatus)
+	mux.HandleFunc("POST /control/wsl/start", s.handleWSLStart)
+	mux.HandleFunc("POST /control/wsl/stop", s.handleWSLStop)
+	mux.HandleFunc("POST /control/wsl/restart", s.handleWSLRestart)
 
 	s.httpSrv = &http.Server{
 		Handler:           s.withAuth(mux),
@@ -215,6 +233,34 @@ func (s *Server) handleConfigPatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeData(w, s.backend.Config())
+}
+
+func (s *Server) handleWSLStatus(w http.ResponseWriter, _ *http.Request) {
+	writeData(w, s.backend.WSLStatus())
+}
+
+func (s *Server) handleWSLStart(w http.ResponseWriter, _ *http.Request) {
+	if err := s.backend.StartWSL(); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeData(w, s.backend.WSLStatus())
+}
+
+func (s *Server) handleWSLStop(w http.ResponseWriter, _ *http.Request) {
+	if err := s.backend.StopWSL(); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeData(w, s.backend.WSLStatus())
+}
+
+func (s *Server) handleWSLRestart(w http.ResponseWriter, _ *http.Request) {
+	if err := s.backend.RestartWSL(); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeData(w, s.backend.WSLStatus())
 }
 
 func describeProcessError(id string, err error) string {

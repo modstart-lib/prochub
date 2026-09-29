@@ -9,6 +9,7 @@ import {
   SetAutoStartEnabled,
   SetAutoStartWSLEnabled,
   StartWSL,
+  StopWSL,
 } from '../../../wailsjs/go/main/App';
 import { useAppStore } from '../../stores/app';
 import { testActionSet, testActionUnset } from '../../utils/test';
@@ -35,6 +36,7 @@ const appStore = useAppStore()
 const platform = ref('')
 const wslStatus = ref<WSLStatus | null>(null)
 const starting = ref(false)
+const stopping = ref(false)
 const restarting = ref(false)
 
 // 开机自启 / WSL 自启状态统一由 Store 持有，CLI 或托盘改动后会自动同步到这里
@@ -42,14 +44,16 @@ const autoStart = computed(() => appStore.autoStart)
 const wslEnabled = computed(() => appStore.autoStartWSL)
 
 const isWindows = computed(() => platform.value === 'windows')
-// The WSL option only takes effect while the app itself auto-starts on boot.
-const wslActive = computed(() => isWindows.value && autoStart.value && wslEnabled.value)
 
 // WSL cold boots can take tens of seconds; treat both the local in-flight
 // action and the backend-reported flag as "starting".
 const wslStarting = computed(
   () => starting.value || restarting.value || !!wslStatus.value?.starting,
 )
+
+// WSL 的启停与「开机时自动启动 WSL」互不依赖：只要在 Windows 且 WSL 可用，
+// 就允许随时查看状态并手动启停，不需要先开启应用开机自启。
+const wslBusy = computed(() => starting.value || stopping.value || restarting.value)
 
 const statusText = computed(() => {
   const status = wslStatus.value
@@ -75,14 +79,17 @@ const statusClass = computed(() => {
 
 const canStart = computed(() => {
   const status = wslStatus.value
-  return (
-    !!status?.available && !status.running && !status.starting && !starting.value && !restarting.value
-  )
+  return !!status?.available && !status.running && !status.starting && !wslBusy.value
+})
+
+const canStop = computed(() => {
+  const status = wslStatus.value
+  return !!status?.available && status.running && !wslBusy.value
 })
 
 const canRestart = computed(() => {
   const status = wslStatus.value
-  return !!status?.available && !starting.value && !restarting.value
+  return !!status?.available && !wslBusy.value
 })
 
 let pollTimer: ReturnType<typeof setInterval> | undefined
@@ -125,7 +132,7 @@ const toggleAutoStart = async (checked: boolean | string | number) => {
 }
 
 const toggleWSL = async (checked: boolean | string | number) => {
-  if (!autoStart.value) return
+  // WSL 自启是独立设置，不依赖应用开机自启，也不影响手动启停
   try {
     await SetAutoStartWSLEnabled(!!checked)
   } catch (e) {
@@ -146,6 +153,19 @@ const handleStart = async () => {
   }
 }
 
+const handleStop = async () => {
+  stopping.value = true
+  try {
+    await StopWSL()
+  } catch (e) {
+    console.error('Failed to stop WSL:', e)
+    message.error(appStore.t('settings.wsl.stopFailed'))
+  } finally {
+    stopping.value = false
+    await refreshWSLStatus()
+  }
+}
+
 const handleRestart = async () => {
   restarting.value = true
   try {
@@ -159,14 +179,15 @@ const handleRestart = async () => {
   }
 }
 
-watch(wslActive, (active) => {
-  if (active) {
+// Windows 下即开始轮询 WSL 状态，与开机自启设置无关
+watch(isWindows, (windows) => {
+  if (windows) {
     void refreshWSLStatus()
     startPolling()
   } else {
     stopPolling()
   }
-})
+}, { immediate: true })
 
 onMounted(async () => {
   try {
@@ -218,32 +239,40 @@ onUnmounted(() => {
     <SettingSection
       v-if="isWindows"
       class="wsl-section"
-      :class="{ 'wsl-inactive': !autoStart }"
       :title="appStore.t('settings.wsl.title')"
-      :desc="autoStart ? appStore.t('settings.wsl.desc') : appStore.t('settings.wsl.requiresAutoStart')"
+      :desc="appStore.t('settings.wsl.desc')"
     >
       <template #icon>
         <Terminal class="w-5 h-5" aria-hidden="true" />
       </template>
       <template #control>
-        <template v-if="wslActive">
-          <span class="wsl-status">
-            <span class="status-dot" :class="statusClass"></span>
-            <span>{{ statusText }}</span>
-          </span>
-          <Button :disabled="!canStart" :loading="starting" @click="handleStart">
-            {{ appStore.t('settings.wsl.start') }}
-          </Button>
-          <Button :disabled="!canRestart" :loading="restarting" @click="handleRestart">
-            {{ appStore.t('settings.wsl.restart') }}
-          </Button>
-        </template>
-        <Switch
-          class="wsl-switch"
-          :checked="wslEnabled"
-          :disabled="!autoStart"
-          @change="toggleWSL"
-        />
+        <span class="wsl-status">
+          <span class="status-dot" :class="statusClass"></span>
+          <span>{{ statusText }}</span>
+        </span>
+        <Button :disabled="!canStart" :loading="starting" @click="handleStart">
+          {{ appStore.t('settings.wsl.start') }}
+        </Button>
+        <Button :disabled="!canStop" :loading="stopping" @click="handleStop">
+          {{ appStore.t('settings.wsl.stop') }}
+        </Button>
+        <Button :disabled="!canRestart" :loading="restarting" @click="handleRestart">
+          {{ appStore.t('settings.wsl.restart') }}
+        </Button>
+      </template>
+    </SettingSection>
+
+    <SettingSection
+      v-if="isWindows"
+      class="wsl-section"
+      :title="appStore.t('settings.wsl.autoStartTitle')"
+      :desc="appStore.t('settings.wsl.autoStartDesc')"
+    >
+      <template #icon>
+        <Power class="w-5 h-5" aria-hidden="true" />
+      </template>
+      <template #control>
+        <Switch class="wsl-switch" :checked="wslEnabled" @change="toggleWSL" />
       </template>
     </SettingSection>
   </div>
@@ -255,11 +284,7 @@ onUnmounted(() => {
 }
 
 .wsl-section {
-  @apply border-l-2 border-slate-200 pl-4 transition-opacity dark:border-slate-700;
-}
-
-.wsl-inactive {
-  @apply opacity-60;
+  @apply border-l-2 border-slate-200 pl-4 dark:border-slate-700;
 }
 
 .wsl-status {

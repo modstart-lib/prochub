@@ -78,3 +78,12 @@ func (m *WSLManager) Restart() error {
 	defer atomic.StoreInt32(&m.busy, 0)
 	return wslRestart()
 }
+
+// Stop shuts down the whole WSL subsystem. It is independent from the
+// auto-start setting: a user can stop WSL at any time regardless of whether the
+// app and/or WSL are configured to start on boot.
+func (m *WSLManager) Stop() error {
+	atomic.StoreInt32(&m.busy, 1)
+	defer atomic.StoreInt32(&m.busy, 0)
+	return wslStop()
+}

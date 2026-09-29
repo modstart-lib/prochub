@@ -225,17 +225,27 @@ func wslSpawnLoginShell(distro string) error {
 
 // wslRestart shuts the whole WSL subsystem down and boots it again.
 func wslRestart() error {
-	if !wslSupported() {
-		return ErrWSLUnsupported
-	}
-
-	if _, err := runWSL("--shutdown"); err != nil {
+	if err := wslStop(); err != nil {
 		return err
 	}
 
 	// Give the subsystem a brief moment to release the VM before booting it.
 	time.Sleep(500 * time.Millisecond)
 	return wslStart()
+}
+
+// wslStop shuts the whole WSL subsystem down and clears the keep-alive handle.
+func wslStop() error {
+	if !wslSupported() {
+		return ErrWSLUnsupported
+	}
+
+	_, err := runWSL("--shutdown")
+	// The keep-alive process dies with the subsystem, so drop the reference.
+	keepAliveMu.Lock()
+	keepAliveCmd = nil
+	keepAliveMu.Unlock()
+	return err
 }
 
 // runWSL executes wsl.exe with the given arguments and returns its combined

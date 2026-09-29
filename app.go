@@ -151,7 +151,7 @@ func (a *App) startup(ctx context.Context) {
 	// Start the local control server used by the CLI.
 	a.startControlServer()
 
-	// Boot WSL on start-up when both app auto-start and WSL auto-start are enabled.
+	// Boot WSL on start-up when the independent WSL auto-start option is enabled.
 	if a.config.AutoStartWSL {
 		go a.startWSLOnBoot()
 	}
@@ -426,8 +426,9 @@ func (a *App) GetAutoStartWSLEnabled() bool {
 	return a.config.AutoStartWSL
 }
 
-// SetAutoStartWSLEnabled enables or disables starting WSL on boot. The option
-// only takes effect while the application auto-start option is enabled.
+// SetAutoStartWSLEnabled enables or disables starting WSL when the app boots.
+// It is an independent setting: it does not require the application auto-start
+// option to be enabled, and it does not block manual start/stop.
 func (a *App) SetAutoStartWSLEnabled(enabled bool) error {
 	return a.patchConfig(func(cfg *config.AppConfig) { cfg.AutoStartWSL = enabled }, originGUI)
 }
@@ -446,6 +447,15 @@ func (a *App) StartWSL() error {
 	return nil
 }
 
+// StopWSL shuts down the whole WSL subsystem.
+func (a *App) StopWSL() error {
+	if err := a.wslMgr.Stop(); err != nil {
+		a.LogSystemError("StopWSL", fmt.Sprintf("Failed to stop WSL: %v", err))
+		return err
+	}
+	return nil
+}
+
 // RestartWSL shuts down and boots the WSL subsystem again.
 func (a *App) RestartWSL() error {
 	if err := a.wslMgr.Restart(); err != nil {
@@ -455,14 +465,10 @@ func (a *App) RestartWSL() error {
 	return nil
 }
 
-// startWSLOnBoot starts WSL when the app itself is registered for auto-start.
-// The WSL option only takes effect together with the app auto-start option.
+// startWSLOnBoot boots WSL when the WSL auto-start option is enabled. The
+// option is independent from the application auto-start option.
 func (a *App) startWSLOnBoot() {
 	if a.wslMgr == nil {
-		return
-	}
-	enabled, err := a.autoStartMgr.IsEnabled()
-	if err != nil || !enabled {
 		return
 	}
 	if err := a.wslMgr.Start(); err != nil {

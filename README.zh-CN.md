@@ -73,12 +73,18 @@ prochub config get                         # 查看当前配置
 prochub config set theme light|dark        # 设置明暗主题
 prochub config set language zh|en          # 设置界面语言
 prochub config set autostart on|off        # 设置开机自动启动
-prochub config set autostart-wsl on|off    # 设置开机自动启动 WSL
+prochub config set autostart-wsl on|off    # 设置开机时自动启动 WSL
+prochub wsl status                         # 查看 WSL 运行状态
+prochub wsl start                          # 启动 WSL
+prochub wsl stop                           # 停止 WSL
+prochub wsl restart                        # 重启 WSL
 prochub status                             # 查看运行状态
 prochub version                            # 查看版本
 ```
 
 进程日志文件保存在数据目录（`<dataDir>/<logDir>/<id>`），因此界面打开时也可用 `logs` 读取。
+
+`autostart-wsl` 只控制“开机时是否自动启动 WSL”，与应用自身的开机自启设置相互独立，也不影响 `wsl start`/`wsl stop` 手动启停。
 
 ## 构建
 

@@ -16,10 +16,12 @@ import (
 // fakeBackend is an in-memory Backend used to exercise the control server and
 // client without a real application.
 type fakeBackend struct {
-	items   []process.Snapshot
-	logs    []string
-	cfg     ConfigSummary
-	started []string
+	items    []process.Snapshot
+	logs     []string
+	cfg      ConfigSummary
+	started  []string
+	running  bool
+	wslCalls []string
 }
 
 func (f *fakeBackend) Status() StatusInfo {
@@ -46,6 +48,28 @@ func (f *fakeBackend) Logs(id string, tail int) ([]string, error) {
 		return f.logs[len(f.logs)-tail:], nil
 	}
 	return f.logs, nil
+}
+
+func (f *fakeBackend) WSLStatus() WSLStatusInfo {
+	return WSLStatusInfo{Supported: true, Available: true, Running: f.running, Distro: "Ubuntu"}
+}
+
+func (f *fakeBackend) StartWSL() error {
+	f.wslCalls = append(f.wslCalls, "start")
+	f.running = true
+	return nil
+}
+
+func (f *fakeBackend) StopWSL() error {
+	f.wslCalls = append(f.wslCalls, "stop")
+	f.running = false
+	return nil
+}
+
+func (f *fakeBackend) RestartWSL() error {
+	f.wslCalls = append(f.wslCalls, "restart")
+	f.running = true
+	return nil
 }
 
 func (f *fakeBackend) Config() ConfigSummary { return f.cfg }

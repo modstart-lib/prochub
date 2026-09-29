@@ -16,3 +16,8 @@ func wslStart() error {
 func wslRestart() error {
 	return ErrWSLUnsupported
 }
+
+// wslStop is a no-op placeholder on non-Windows platforms.
+func wslStop() error {
+	return ErrWSLUnsupported
+}

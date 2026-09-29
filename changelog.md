@@ -18,7 +18,7 @@
 - 测试：`tests/run.ts` 首次构建等待超时放宽至 10 分钟，并忽略 `ResizeObserver loop` 无害告警
 - 截图：更新 demo 截图以反映新视觉
 - 优化：端口规范化为 53090 段（53090 自动化测试端口 / 53091 前端开发端口 / 53092 截图端口 / 53093 CLI 控制接口端口），避免与其他程序调试时端口冲突。
-- 新增：命令行工具（与主程序同一可执行文件，无参启动界面，带子命令时执行 CLI）：`process list/start/stop/logs`（日志支持 `--tail`/`--follow`）、`config get/set theme|language|autostart|autostart-wsl`、`status`、`version`，通过启动时写入数据目录的 `auth.json`（端口 + 令牌）与运行中的应用通信
+- 新增：命令行工具（与主程序同一可执行文件，无参启动界面，带子命令时执行 CLI）：`process list/start/stop/logs`（日志支持 `--tail`/`--follow`）、`config get/set theme|language|autostart|autostart-wsl`、`wsl status/start/stop/restart`、`status`、`version`，通过启动时写入数据目录的 `auth.json`（端口 + 令牌）与运行中的应用通信
 - 新增：应用启动时在 `127.0.0.1:53093` 启动本地控制接口（携带令牌鉴权），退出时自动清理 `auth.json`
 - 新增：主题改为后端配置存储（`AppConfig.theme`），新增 `SetTheme`/`SetLocale` 接口并统一配置写入路径；CLI 或外部变更主题/语言时通过事件实时同步到界面
 - 优化：统一 `applyConfig` 为唯一配置写入路径（持久化 + 开机自启副作用 + 托盘语言刷新 + 界面事件通知），消除各处分散保存逻辑
@@ -28,6 +28,10 @@
 - 优化：配置与进程写入全部收敛到 `applyConfig` 单一写入路径，消除 `AddProcess`、`RemoveProcess`、`UpdateProcess`、`SetProcessAutoStart`、设备 UUID 等处的旁路保存
 - 修复：CLI 并发修改不同配置项时相互覆盖（读改写丢失更新），配置与进程写入增加互斥锁保护，并通过 `-race` 全量校验
 - 重构：开机自启/WSL 自启状态由界面组件局部 ref 上移到 Store，移除脆弱的回调注册桥接
+- 新增：CLI 新增独立 `wsl` 子命令：`prochub wsl status|start|stop|restart`，用于查看 WSL 状态并手动启停；控制接口新增 `/control/wsl` 系列端点
+- 新增：WSL 管理新增 `Stop` 能力（`wsl --shutdown`），补齐此前只有启动/重启的缺口
+- 优化：解除 WSL 与「开机自启」的相互依赖——`AutoStartWSL` 不再需要应用开机自启为前置条件，`startWSLOnBoot` 移除对 `IsEnabled` 的检查
+- 优化：设置页 WSL 拆为独立分区（运行状态 + 启动/停止/重启按钮 + 开机自启开关），仅在 Windows 显示，与应用开机自启状态完全解耦；移除 `wsl-inactive` 置灰与 `requiresAutoStart` 提示
 
 ## v0.6.0 Windows 托盘交互优化，WSL 自动启动，数据目录配置增强
 

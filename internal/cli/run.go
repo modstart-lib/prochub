@@ -29,18 +29,26 @@ const usageText = `ProcHub 命令行工具
   prochub config set theme <light|dark>       设置明暗主题
   prochub config set language <zh|en>         设置界面语言
   prochub config set autostart <on|off>       设置开机自动启动
-  prochub config set autostart-wsl <on|off>   设置开机自动启动 WSL
+  prochub config set autostart-wsl <on|off>   设置开机时自动启动 WSL
+  prochub wsl status                          查看 WSL 运行状态
+  prochub wsl start                           启动 WSL
+  prochub wsl stop                            停止 WSL
+  prochub wsl restart                         重启 WSL
   prochub status                              查看运行状态
   prochub version                             查看版本
 
 说明：
   命令需要 ProcHub 正在运行。程序启动时会把控制端口与令牌写入数据目录的
   auth.json，命令行读取后与应用通信。
+
+  「开机时自动启动 WSL」是独立的开机行为设置，与 wsl start/stop 手动启停
+  互不影响，也不依赖应用自身的开机自启设置。
 `
 
 var cliCommands = map[string]bool{
 	"process":   true,
 	"config":    true,
+	"wsl":       true,
 	"status":    true,
 	"version":   true,
 	"help":      true,
@@ -86,6 +94,8 @@ func Run(args []string, opts Options) int {
 		cmdErr = runProcess(client, args[1:], opts)
 	case "config":
 		cmdErr = runConfig(client, args[1:], opts)
+	case "wsl":
+		cmdErr = runWSL(client, args[1:], opts)
 	default:
 		fmt.Fprint(opts.Stderr, usageText)
 		return 2
