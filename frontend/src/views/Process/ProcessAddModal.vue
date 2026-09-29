@@ -1,12 +1,11 @@
 <script lang="ts" setup>
-import { Button, Divider, Form, FormItem, Input, InputNumber, Modal, Select, Switch, TabPane, Tabs, message } from 'ant-design-vue'
-import { FileSearch, Folder, FolderOpen, Minus, Plus, Settings2, Terminal, Variable } from 'lucide-vue-next'
+import { Modal, message } from 'ant-design-vue'
 import { reactive, ref, watch } from 'vue'
-import * as AppAPI from '../../../wailsjs/go/main/App'
 import { process as ProcessModels } from '../../../wailsjs/go/models'
 import { trackVisit } from '../../services/analytics'
 import { useAppStore } from '../../stores/app'
 import { testActionSet } from '../../utils/test'
+import ProcessFormTabs, { type ProcessForm } from './ProcessFormTabs.vue'
 
 const props = defineProps<{ visible: boolean }>()
 
@@ -19,7 +18,7 @@ watch(() => props.visible, (visible) => {
 const emit = defineEmits<{ 'update:visible': [boolean] }>()
 const appStore = useAppStore()
 
-const form = reactive({
+const form = reactive<ProcessForm>({
   name: '',
   command: '',
   args: '',
@@ -67,44 +66,9 @@ watch(() => form.command, (newCommand) => {
   }
 })
 
-// 选择工作目录
-const selectWorkingDir = async () => {
-  try {
-    const dir = await AppAPI.SelectDirectory()
-    if (dir) {
-      form.workingDir = dir
-    }
-  } catch (error) {
-    console.error('Failed to select directory:', error)
-  }
-}
-
-// 选择命令文件
-const selectCommand = async () => {
-  try {
-    const file = await AppAPI.SelectFile()
-    if (file) {
-      form.command = file
-    }
-  } catch (error) {
-    console.error('Failed to select file:', error)
-  }
-}
-
-const addEnv = () => {
-  form.env.push({ key: '', value: '' })
-}
-
-const removeEnv = (index: number) => {
-  form.env.splice(index, 1)
-  if (form.env.length === 0) {
-    form.env.push({ key: '', value: '' })
-  }
-}
-
 const handleOk = async () => {
   if (!form.command) {
-    message.warning(appStore.t('validation.commandRequired') || 'Please enter a command')
+    message.warning(appStore.t('validation.commandRequired'))
     return
   }
 
@@ -132,10 +96,10 @@ const handleOk = async () => {
 
   try {
     await appStore.addProcess(definition)
-    message.success(appStore.t('messages.processAdded') || 'Process added successfully')
+    message.success(appStore.t('messages.processAdded'))
     emit('update:visible', false)
   } catch (error) {
-    message.error(appStore.t('messages.operationFailed') || 'Failed to add process')
+    message.error(appStore.t('messages.operationFailed'))
   }
 }
 
@@ -148,18 +112,12 @@ watch(
   },
 )
 
-const restartPolicyOptions = [
-  { value: 'always', label: 'Always' },
-  { value: 'on_failure', label: 'On Failure' },
-  { value: 'never', label: 'Never' },
-]
-
 // ── 自动化测试 action ──────────────────────────────────────────────────────
 testActionSet('ProcessAdd.getForm', () => ({ ...form, env: form.env.map((e) => ({ ...e })) }))
 testActionSet('ProcessAdd.getTab', () => activeTab.value)
 testActionSet('ProcessAdd.setTab', (params: unknown) => {
   const { tab } = params as { tab: string }
-  activeTab.value = tab as 'basic' | 'advanced' | 'env'
+  activeTab.value = tab
 })
 testActionSet('ProcessAdd.fill', (params: unknown) => {
   const p = params as {
@@ -186,11 +144,12 @@ testActionSet('ProcessAdd.fill', (params: unknown) => {
 testActionSet('ProcessAdd.addEnv', (params: unknown) => {
   const { times } = (params ?? {}) as { times?: number }
   const n = Math.max(1, times ?? 1)
-  for (let i = 0; i < n; i++) addEnv()
+  for (let i = 0; i < n; i++) form.env.push({ key: '', value: '' })
 })
 testActionSet('ProcessAdd.removeEnv', (params: unknown) => {
   const { index } = params as { index: number }
-  removeEnv(index)
+  form.env.splice(index, 1)
+  if (form.env.length === 0) form.env.push({ key: '', value: '' })
 })
 testActionSet('ProcessAdd.getEnvCount', () => form.env.length)
 testActionSet('ProcessAdd.submit', async () => {
@@ -200,6 +159,9 @@ testActionSet('ProcessAdd.submit', async () => {
 testActionSet('ProcessAdd.cancel', () => {
   emit('update:visible', false)
 })
+
+// ── 截图专用 action（prepare / cleanup）─────────────────────────────────────
+
 </script>
 
 <template>
@@ -208,219 +170,10 @@ testActionSet('ProcessAdd.cancel', () => {
     :title="appStore.t('processes.addTitle')"
     :ok-text="appStore.t('actions.save')"
     :cancel-text="appStore.t('actions.cancel')"
-    width="560px"
-    class="process-modal"
+    width="min(600px, 90vw)"
     @ok="handleOk"
     @cancel="emit('update:visible', false)"
   >
-    <Tabs v-model:activeKey="activeTab" class="modal-tabs">
-      <!-- 基础设置 -->
-      <TabPane key="basic">
-        <template #tab>
-          <span class="tab-label">
-            <Terminal :size="14" />
-            {{ appStore.t('tabs.basic') || 'Basic' }}
-          </span>
-        </template>
-        <Form layout="vertical" class="modal-form">
-          <FormItem :label="appStore.t('processes.fields.name')">
-            <Input 
-              v-model:value="form.name" 
-              :placeholder="appStore.t('processes.placeholders.name')"
-            />
-          </FormItem>
-          <FormItem :label="appStore.t('processes.fields.command')" required>
-            <div class="input-with-button">
-              <Input 
-                v-model:value="form.command" 
-                :placeholder="appStore.t('processes.placeholders.command')"
-              >
-                <template #prefix>
-                  <Terminal :size="14" class="input-icon" />
-                </template>
-              </Input>
-              <Button @click="selectCommand">
-                <template #icon>
-                  <FileSearch :size="14" />
-                </template>
-              </Button>
-            </div>
-          </FormItem>
-          <FormItem :label="appStore.t('processes.fields.args')">
-            <Input 
-              v-model:value="form.args" 
-              :placeholder="appStore.t('processes.placeholders.args')"
-            />
-          </FormItem>
-          <FormItem :label="appStore.t('processes.fields.workingDir')">
-            <div class="input-with-button">
-              <Input 
-                v-model:value="form.workingDir" 
-                :placeholder="appStore.t('processes.placeholders.workingDir')"
-              >
-                <template #prefix>
-                  <Folder :size="14" class="input-icon" />
-                </template>
-              </Input>
-              <Button @click="selectWorkingDir">
-                <template #icon>
-                  <FolderOpen :size="14" />
-                </template>
-              </Button>
-            </div>
-          </FormItem>
-        </Form>
-      </TabPane>
-
-      <!-- 高级设置 -->
-      <TabPane key="advanced">
-        <template #tab>
-          <span class="tab-label">
-            <Settings2 :size="14" />
-            {{ appStore.t('tabs.advanced') || 'Advanced' }}
-          </span>
-        </template>
-        <Form layout="vertical" class="modal-form">
-          <FormItem :label="appStore.t('processes.fields.autoStart')">
-            <div class="switch-wrapper">
-              <Switch v-model:checked="form.autoStart" />
-              <span class="switch-label">{{ form.autoStart ? appStore.t('actions.enabled') : appStore.t('actions.disabled') }}</span>
-            </div>
-          </FormItem>
-          <FormItem :label="appStore.t('processes.fields.restartPolicy')">
-            <Select 
-              v-model:value="form.restartPolicy" 
-              :options="restartPolicyOptions"
-            />
-          </FormItem>
-          <FormItem :label="appStore.t('processes.fields.maxRetries')">
-            <InputNumber 
-              v-model:value="form.maxRetries" 
-              :min="0" 
-              :max="100"
-              class="w-full"
-            />
-          </FormItem>
-        </Form>
-      </TabPane>
-
-      <!-- 环境变量 -->
-      <TabPane key="env">
-        <template #tab>
-          <span class="tab-label">
-            <Variable :size="14" />
-            {{ appStore.t('tabs.environment') || 'Environment' }}
-          </span>
-        </template>
-        <div class="env-section">
-          <div class="env-header">
-            <span class="env-title">{{ appStore.t('processes.fields.env') }}</span>
-            <Button type="dashed" size="small" @click="addEnv">
-              <template #icon><Plus :size="14" /></template>
-              {{ appStore.t('actions.addEnv') }}
-            </Button>
-          </div>
-          <Divider class="my-3" />
-          <div class="env-list">
-            <div v-for="(item, index) in form.env" :key="index" class="env-row">
-              <Input 
-                v-model:value="item.key" 
-                placeholder="KEY" 
-                class="env-key"
-              />
-              <span class="env-separator">=</span>
-              <Input 
-                v-model:value="item.value" 
-                placeholder="VALUE" 
-                class="env-value"
-              />
-              <Button 
-                type="text" 
-                danger 
-                size="small" 
-                @click="removeEnv(index)"
-                :disabled="form.env.length === 1 && !item.key && !item.value"
-              >
-                <template #icon><Minus :size="14" /></template>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </TabPane>
-    </Tabs>
+    <ProcessFormTabs :form="form" :active-tab="activeTab" @update:active-tab="activeTab = $event" />
   </Modal>
 </template>
-
-<style scoped>
-.process-modal :deep(.ant-modal-content) {
-  @apply rounded-xl;
-}
-
-.modal-tabs :deep(.ant-tabs-nav) {
-  @apply mb-4;
-}
-
-.tab-label {
-  @apply flex items-center gap-1.5;
-}
-
-.modal-form {
-  @apply space-y-4;
-}
-
-.input-icon {
-  @apply text-slate-400;
-}
-
-.switch-wrapper {
-  @apply flex items-center gap-3;
-}
-
-.switch-label {
-  @apply text-sm text-slate-600 dark:text-slate-400;
-}
-
-.env-section {
-  @apply py-2;
-}
-
-.env-header {
-  @apply flex items-center justify-between;
-}
-
-.env-title {
-  @apply text-sm font-medium text-slate-700 dark:text-slate-300;
-}
-
-.env-list {
-  @apply space-y-2;
-}
-
-.env-row {
-  @apply flex items-center gap-2;
-}
-
-.env-key {
-  @apply flex-1;
-}
-
-.env-separator {
-  @apply text-slate-400 font-mono;
-}
-
-.env-value {
-  @apply flex-1;
-}
-
-.input-with-button {
-  @apply flex items-center gap-2;
-}
-
-.input-with-button .ant-input-affix-wrapper {
-  @apply flex-1;
-}
-
-.w-full {
-  width: 100%;
-}
-</style>

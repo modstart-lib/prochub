@@ -81,6 +81,18 @@ export default {
       errored: '失败',
       starting: '启动中',
     },
+    restartPolicies: {
+      always: '始终重启',
+      onFailure: '失败时重启',
+      never: '从不重启',
+    },
+    env: {
+      key: '键',
+      value: '值',
+    },
+    pickCommand: '选择命令文件',
+    pickWorkingDir: '选择工作目录',
+    count: '共 {count} 个',
     empty: '暂无进程',
   },
   messages: {
@@ -105,6 +117,8 @@ export default {
     filterErrors: '仅显示错误',
     scrollToBottom: '滚动到底部',
     download: '下载日志',
+    errorLabel: '错误：',
+    lineCount: '共 {count} 行',
     empty: '暂无日志',
   },
   settings: {
@@ -113,6 +127,7 @@ export default {
     language: '语言',
     about: '关于',
     aboutDesc: 'ProcHub - 跨平台进程管理工具',
+    feedback: '工单反馈',
     theme: {
       title: '主题',
       desc: '选择您喜欢的主题',
@@ -148,6 +163,11 @@ export default {
       currentVersion: '当前版本',
       updateAvailable: '发现新版本',
       updateConfirm: '发现新版本 {version}，是否打开浏览器下载？',
+    },
+    dataDir: {
+      title: '数据目录',
+      desc: '检测到自定义数据目录，实际运行路径如下',
+      open: '打开',
     },
     linkCopied: '链接已复制到剪贴板',
     linkCopyFailed: '复制链接失败',

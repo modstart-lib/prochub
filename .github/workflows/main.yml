@@ -335,10 +335,13 @@ jobs:
             cp "$f" "$tmpdir/$clean"
             echo "Staged: $base -> $clean"
           done
+          # Read the app version from app.go and build the snapshot title
+          VERSION=$(sed -n 's/.*Version:[[:space:]]*"v*\([^"]*\)".*/\1/p' app.go | head -1)
+          echo "Detected version: $VERSION"
           # Create a brand new snapshot release and mark it as latest
           echo "=== Creating fresh vsnapshot release ==="
           gh release create vsnapshot \
-            --title "Snapshot" \
+            --title "snapshot-${VERSION}" \
             --notes "Latest build from main branch" \
             --latest
           echo "=== Uploading to vsnapshot ==="

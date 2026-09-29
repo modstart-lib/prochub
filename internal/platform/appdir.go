@@ -56,6 +56,21 @@ func DataDir() (string, error) {
 	return resolved, nil
 }
 
+// IsDefaultDataDir reports whether the effective data directory resolves to
+// the built-in default (~/.prochub/data). It returns true when either path
+// cannot be resolved so callers never advertise a custom location by mistake.
+func IsDefaultDataDir() bool {
+	def, err := defaultDataRoot()
+	if err != nil {
+		return true
+	}
+	actual, err := DataDir()
+	if err != nil {
+		return true
+	}
+	return filepath.Clean(actual) == filepath.Clean(def)
+}
+
 // MustDataDir is like DataDir but never returns an error: it falls back to a
 // directory under the OS temp dir when the user home cannot be resolved.
 func MustDataDir() string {

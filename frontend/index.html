@@ -15,14 +15,21 @@
             width: 100%;
         }
 
-        @media (prefers-color-scheme: dark) {
-
-            html,
-            body {
-                background-color: #0f172a;
-            }
+        html.dark,
+        html.dark body {
+            background-color: #0f172a;
         }
     </style>
+    <script>
+        // Apply the persisted theme before first paint to avoid a light flash.
+        try {
+            if (localStorage.getItem('theme') === 'dark') {
+                document.documentElement.classList.add('dark');
+            }
+        } catch (e) {
+            /* ignore storage access errors */
+        }
+    </script>
 </head>
 
 <body spellcheck="false">

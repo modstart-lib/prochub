@@ -27,30 +27,61 @@ export interface ProcessItem {
 export const useAppStore = defineStore('app', () => {
   const locale = ref<'zh' | 'en'>('zh')
   const isDark = ref(false)
+  const autoStart = ref(false)
+  const autoStartWSL = ref(false)
   const processes = ref<ProcessItem[]>([])
   const logs = ref<string[]>([])
 
   const t = (key: string, params?: Record<string, unknown>) => i18n.global.t(key, params || {})
 
-  const setLocale = async (nextLocale: 'zh' | 'en') => {
+  // applyLocale updates the in-memory locale without touching the backend.
+  const applyLocale = (nextLocale: 'zh' | 'en') => {
     locale.value = nextLocale
     i18n.global.locale.value = nextLocale
-    // Save to backend config
+  }
+
+  const setLocale = async (nextLocale: 'zh' | 'en') => {
+    applyLocale(nextLocale)
+    // Persist to backend config so the CLI shares the same source of truth.
     try {
-      const config = await AppAPI.GetConfig()
-      config.locale = nextLocale
-      await AppAPI.UpdateConfig(config)
+      await AppAPI.SetLocale(nextLocale)
     } catch (error) {
       console.error('Failed to save locale setting:', error)
     }
   }
 
+  // applyTheme applies the theme locally and mirrors it to localStorage so the
+  // first-paint script can avoid a light flash.
+  const applyTheme = (nextTheme: 'light' | 'dark') => {
+    const dark = nextTheme === 'dark'
+    isDark.value = dark
+    document.documentElement.classList.toggle('dark', dark)
+    localStorage.setItem('theme', nextTheme)
+  }
+
   const setTheme = async (nextIsDark: boolean) => {
-    isDark.value = nextIsDark
-    document.documentElement.classList.toggle('dark', nextIsDark)
-    // Save theme preference to localStorage for now
-    // (backend config doesn't have a theme field yet)
-    localStorage.setItem('theme', nextIsDark ? 'dark' : 'light')
+    const nextTheme = nextIsDark ? 'dark' : 'light'
+    applyTheme(nextTheme)
+    try {
+      await AppAPI.SetTheme(nextTheme)
+    } catch (error) {
+      console.error('Failed to save theme setting:', error)
+    }
+  }
+
+  // applyConfig applies a full configuration snapshot pushed by the backend.
+  // It is the single entry point for configuration arriving from any source
+  // (GUI, CLI, tray), so the UI never drifts from the persisted state.
+  const applyConfig = (config: {
+    theme?: string
+    locale?: string
+    autoStart?: boolean
+    autoStartWSL?: boolean
+  }) => {
+    if (config.theme) applyTheme(config.theme === 'dark' ? 'dark' : 'light')
+    if (config.locale) applyLocale(config.locale === 'en' ? 'en' : 'zh')
+    if (typeof config.autoStart === 'boolean') autoStart.value = config.autoStart
+    if (typeof config.autoStartWSL === 'boolean') autoStartWSL.value = config.autoStartWSL
   }
 
   // Load processes from backend
@@ -204,19 +235,15 @@ export const useAppStore = defineStore('app', () => {
   const initSettings = async () => {
     try {
       const config = await AppAPI.GetConfig()
-      // Load locale from backend
-      if (config.locale) {
-        const localeValue = config.locale as 'zh' | 'en'
-        locale.value = localeValue
-        i18n.global.locale.value = localeValue
-      }
-      // Load theme from localStorage
-      const savedTheme = localStorage.getItem('theme')
-      if (savedTheme) {
-        const dark = savedTheme === 'dark'
-        isDark.value = dark
-        document.documentElement.classList.toggle('dark', dark)
-      }
+      // Load theme from backend config, falling back to localStorage for
+      // installs created before the theme field existed.
+      const savedTheme = (config.theme as string) || localStorage.getItem('theme') || 'light'
+      applyConfig({
+        theme: savedTheme,
+        locale: (config.locale as string) || 'zh',
+        autoStart: config.autoStart,
+        autoStartWSL: config.autoStartWSL,
+      })
     } catch (error) {
       console.error('Failed to load settings:', error)
     }
@@ -225,6 +252,8 @@ export const useAppStore = defineStore('app', () => {
   return {
     locale,
     isDark,
+    autoStart,
+    autoStartWSL,
     processes,
     logs,
     runningCount,
@@ -232,6 +261,9 @@ export const useAppStore = defineStore('app', () => {
     failedCount,
     setLocale,
     setTheme,
+    applyLocale,
+    applyTheme,
+    applyConfig,
     t,
     initSettings,
     loadProcesses,

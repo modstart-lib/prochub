@@ -3,8 +3,6 @@ import { Button, message, Switch } from 'ant-design-vue';
 import { Power, Terminal } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import {
-  GetAutoStartEnabled,
-  GetAutoStartWSLEnabled,
   GetPlatform,
   GetWSLStatus,
   RestartWSL,
@@ -14,6 +12,7 @@ import {
 } from '../../../wailsjs/go/main/App';
 import { useAppStore } from '../../stores/app';
 import { testActionSet, testActionUnset } from '../../utils/test';
+import SettingSection from './SettingSection.vue';
 
 interface WSLDistro {
   name: string
@@ -33,12 +32,14 @@ interface WSLStatus {
 }
 
 const appStore = useAppStore()
-const autoStart = ref(false)
 const platform = ref('')
-const wslEnabled = ref(false)
 const wslStatus = ref<WSLStatus | null>(null)
 const starting = ref(false)
 const restarting = ref(false)
+
+// 开机自启 / WSL 自启状态统一由 Store 持有，CLI 或托盘改动后会自动同步到这里
+const autoStart = computed(() => appStore.autoStart)
+const wslEnabled = computed(() => appStore.autoStartWSL)
 
 const isWindows = computed(() => platform.value === 'windows')
 // The WSL option only takes effect while the app itself auto-starts on boot.
@@ -117,10 +118,9 @@ const refreshWSLStatus = async () => {
 const toggleAutoStart = async (checked: boolean | string | number) => {
   try {
     await SetAutoStartEnabled(!!checked)
-    autoStart.value = !!checked
+    // 后端会广播 config:changed，界面状态由 Store 自动回填，无需本地赋值
   } catch (e) {
     console.error('Failed to update auto-start:', e)
-    autoStart.value = !checked
   }
 }
 
@@ -128,10 +128,8 @@ const toggleWSL = async (checked: boolean | string | number) => {
   if (!autoStart.value) return
   try {
     await SetAutoStartWSLEnabled(!!checked)
-    wslEnabled.value = !!checked
   } catch (e) {
     console.error('Failed to update WSL auto-start:', e)
-    wslEnabled.value = !checked
   }
 }
 
@@ -172,21 +170,9 @@ watch(wslActive, (active) => {
 
 onMounted(async () => {
   try {
-    autoStart.value = await GetAutoStartEnabled()
-  } catch (e) {
-    console.error('Failed to load auto-start status:', e)
-  }
-
-  try {
     platform.value = await GetPlatform()
   } catch (e) {
     console.error('Failed to load platform:', e)
-  }
-
-  try {
-    wslEnabled.value = await GetAutoStartWSLEnabled()
-  } catch (e) {
-    console.error('Failed to load WSL auto-start status:', e)
   }
 
   testActionSet('Setting.getAutoStart', () => autoStart.value)
@@ -220,61 +206,35 @@ onUnmounted(() => {
 
 <template>
   <div class="autostart-group">
-    <div class="setting-section">
-      <div class="section-header">
-        <div class="section-icon autostart-icon">
-          <Power :size="18" />
-        </div>
-        <div class="section-info">
-          <h3 class="section-title">{{ appStore.t('settings.autoStart.title') }}</h3>
-          <p class="section-desc">{{ appStore.t('settings.autoStart.desc') }}</p>
-        </div>
-      </div>
-      <div class="section-control">
-        <Switch
-          class="autostart-switch"
-          :checked="autoStart"
-          @change="toggleAutoStart"
-        />
-      </div>
-    </div>
+    <SettingSection :title="appStore.t('settings.autoStart.title')" :desc="appStore.t('settings.autoStart.desc')">
+      <template #icon>
+        <Power class="w-5 h-5" aria-hidden="true" />
+      </template>
+      <template #control>
+        <Switch :checked="autoStart" @change="toggleAutoStart" />
+      </template>
+    </SettingSection>
 
-    <div
+    <SettingSection
       v-if="isWindows"
-      class="setting-section wsl-section"
+      class="wsl-section"
       :class="{ 'wsl-inactive': !autoStart }"
+      :title="appStore.t('settings.wsl.title')"
+      :desc="autoStart ? appStore.t('settings.wsl.desc') : appStore.t('settings.wsl.requiresAutoStart')"
     >
-      <div class="section-header">
-        <div class="section-icon wsl-icon">
-          <Terminal :size="18" />
-        </div>
-        <div class="section-info">
-          <h3 class="section-title">{{ appStore.t('settings.wsl.title') }}</h3>
-          <p class="section-desc">
-            {{ autoStart ? appStore.t('settings.wsl.desc') : appStore.t('settings.wsl.requiresAutoStart') }}
-          </p>
-        </div>
-      </div>
-      <div class="section-control">
+      <template #icon>
+        <Terminal class="w-5 h-5" aria-hidden="true" />
+      </template>
+      <template #control>
         <template v-if="wslActive">
           <span class="wsl-status">
             <span class="status-dot" :class="statusClass"></span>
-            <span class="status-text">{{ statusText }}</span>
+            <span>{{ statusText }}</span>
           </span>
-          <Button
-            size="small"
-            :disabled="!canStart"
-            :loading="starting"
-            @click="handleStart"
-          >
+          <Button :disabled="!canStart" :loading="starting" @click="handleStart">
             {{ appStore.t('settings.wsl.start') }}
           </Button>
-          <Button
-            size="small"
-            :disabled="!canRestart"
-            :loading="restarting"
-            @click="handleRestart"
-          >
+          <Button :disabled="!canRestart" :loading="restarting" @click="handleRestart">
             {{ appStore.t('settings.wsl.restart') }}
           </Button>
         </template>
@@ -284,8 +244,8 @@ onUnmounted(() => {
           :disabled="!autoStart"
           @change="toggleWSL"
         />
-      </div>
-    </div>
+      </template>
+    </SettingSection>
   </div>
 </template>
 
@@ -294,48 +254,12 @@ onUnmounted(() => {
   @apply flex flex-col gap-4;
 }
 
-.setting-section {
-  @apply flex flex-row items-center justify-between gap-4;
-}
-
 .wsl-section {
-  @apply pl-4 border-l-2 border-slate-200 dark:border-slate-700 transition-opacity;
+  @apply border-l-2 border-slate-200 pl-4 transition-opacity dark:border-slate-700;
 }
 
 .wsl-inactive {
   @apply opacity-60;
-}
-
-.section-header {
-  @apply flex items-center gap-3;
-}
-
-.section-icon {
-  @apply flex h-10 w-10 items-center justify-center rounded-lg;
-}
-
-.autostart-icon {
-  @apply bg-green-100 text-green-600 dark:bg-green-900/50 dark:text-green-400;
-}
-
-.wsl-icon {
-  @apply bg-indigo-100 text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-400;
-}
-
-.section-info {
-  @apply flex flex-col;
-}
-
-.section-title {
-  @apply text-sm font-semibold text-slate-800 dark:text-slate-200;
-}
-
-.section-desc {
-  @apply text-xs text-slate-500 dark:text-slate-400;
-}
-
-.section-control {
-  @apply flex items-center gap-2;
 }
 
 .wsl-status {
@@ -347,7 +271,7 @@ onUnmounted(() => {
 }
 
 .status-dot.running {
-  @apply bg-green-500;
+  @apply bg-emerald-500;
 }
 
 .status-dot.starting {
@@ -368,6 +292,7 @@ onUnmounted(() => {
   100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.3;
   }

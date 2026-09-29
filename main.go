@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"embed"
+	"os"
 	goruntime "runtime"
 	"sync/atomic"
 
+	"prochub/internal/cli"
 	"prochub/internal/platform"
 
 	"github.com/wailsapp/wails/v2"
@@ -112,6 +114,17 @@ func wrapShutdown(app *App) func(ctx context.Context) {
 }
 
 func main() {
+	// CLI mode: handle subcommands and exit before starting the GUI. The GUI is
+	// started only when no known CLI command is present.
+	if cli.IsCommand(os.Args[1:]) {
+		os.Exit(cli.Run(os.Args[1:], cli.Options{
+			DataDir: platform.MustDataDir(),
+			Version: appConfig.Version,
+			Stdout:  os.Stdout,
+			Stderr:  os.Stderr,
+		}))
+	}
+
 	// Create an instance of the app structure
 	app := NewApp()
 	globalApp = app

@@ -4,6 +4,7 @@ import { Moon, Sun } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted } from 'vue';
 import { useAppStore } from '../../stores/app';
 import { testActionSet, testActionUnset } from '../../utils/test';
+import SettingSection from './SettingSection.vue';
 
 const appStore = useAppStore()
 
@@ -27,106 +28,32 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="setting-section">
-    <div class="section-header">
-      <div class="section-icon theme-icon">
-        <Sun v-if="!appStore.isDark" :size="18" />
-        <Moon v-else :size="18" />
-      </div>
-      <div class="section-info">
-        <h3 class="section-title">{{ appStore.t('settings.theme.title') }}</h3>
-        <p class="section-desc">{{ appStore.t('settings.theme.desc') }}</p>
-      </div>
-    </div>
-    <div class="section-control">
+  <SettingSection :title="appStore.t('settings.theme.title')" :desc="appStore.t('settings.theme.desc')">
+    <template #icon>
+      <Sun v-if="!appStore.isDark" class="w-5 h-5" aria-hidden="true" />
+      <Moon v-else class="w-5 h-5" aria-hidden="true" />
+    </template>
+    <template #control>
       <RadioGroup v-model:value="themeMode" button-style="solid">
-        <RadioButton value="light" class="theme-button">
-          <Sun :size="14" class="button-icon" />
-          {{ appStore.t('settings.theme.light') }}
+        <RadioButton value="light">
+          <span class="theme-option">
+            <Sun class="w-4 h-4" aria-hidden="true" />
+            {{ appStore.t('settings.theme.light') }}
+          </span>
         </RadioButton>
-        <RadioButton value="dark" class="theme-button">
-          <Moon :size="14" class="button-icon" />
-          {{ appStore.t('settings.theme.dark') }}
+        <RadioButton value="dark">
+          <span class="theme-option">
+            <Moon class="w-4 h-4" aria-hidden="true" />
+            {{ appStore.t('settings.theme.dark') }}
+          </span>
         </RadioButton>
       </RadioGroup>
-    </div>
-  </div>
+    </template>
+  </SettingSection>
 </template>
 
 <style scoped>
-.setting-section {
-  @apply flex flex-row items-center justify-between gap-4;
-}
-
-.section-header {
-  @apply flex items-center gap-3;
-}
-
-.section-icon {
-  @apply flex h-10 w-10 items-center justify-center rounded-lg;
-}
-
-.theme-icon {
-  @apply bg-amber-100 text-amber-600 dark:bg-amber-900/50 dark:text-amber-400;
-}
-
-.section-info {
-  @apply flex flex-col;
-}
-
-.section-title {
-  @apply text-sm font-semibold text-slate-800 dark:text-slate-200;
-}
-
-.section-desc {
-  @apply text-xs text-slate-500 dark:text-slate-400;
-}
-
-.section-control {
-  @apply flex items-center;
-}
-
-.theme-button {
+.theme-option {
   @apply flex items-center gap-1.5;
-}
-
-.button-icon {
-  @apply -ml-0.5;
-}
-
-.section-control :deep(.ant-radio-group) {
-  @apply flex;
-}
-
-.section-control :deep(.ant-radio-button-wrapper) {
-  @apply flex items-center gap-1.5 border-slate-300 dark:border-slate-600;
-}
-
-.section-control :deep(.ant-radio-button-wrapper > span) {
-  @apply flex items-center gap-1.5;
-}
-
-.section-control :deep(.ant-radio-button-wrapper:first-child) {
-  @apply rounded-l-lg;
-}
-
-.section-control :deep(.ant-radio-button-wrapper:last-child) {
-  @apply rounded-r-lg;
-}
-
-.section-control :deep(.ant-radio-button-wrapper-checked) {
-  @apply bg-indigo-500 border-indigo-500 text-white;
-}
-
-.section-control :deep(.ant-radio-button-wrapper-checked:hover) {
-  @apply bg-indigo-600 border-indigo-600;
-}
-
-.section-control :deep(.ant-radio-button-wrapper:not(.ant-radio-button-wrapper-checked)) {
-  @apply bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300;
-}
-
-.section-control :deep(.ant-radio-button-wrapper:not(.ant-radio-button-wrapper-checked):hover) {
-  @apply text-indigo-500 dark:text-indigo-400;
 }
 </style>

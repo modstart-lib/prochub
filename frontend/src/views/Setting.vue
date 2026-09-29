@@ -6,6 +6,7 @@ import { isAppStoreBuild } from '../services/version';
 import { useAppStore } from '../stores/app';
 import SettingAbout from './Setting/SettingAbout.vue';
 import SettingAutoStart from './Setting/SettingAutoStart.vue';
+import SettingDataDir from './Setting/SettingDataDir.vue';
 import SettingLanguage from './Setting/SettingLanguage.vue';
 import SettingTheme from './Setting/SettingTheme.vue';
 import SettingVersion from './Setting/SettingVersion.vue';
@@ -20,7 +21,7 @@ onMounted(() => {
 <template>
   <div class="settings-page">
     <div class="settings-header">
-      <h2 class="settings-title">{{ appStore.t('settings.title') }}</h2>
+      <div class="settings-title">{{ appStore.t('settings.title') }}</div>
     </div>
 
     <div class="settings-content">
@@ -31,6 +32,7 @@ onMounted(() => {
       <SettingAutoStart />
       <Divider v-if="!isAppStoreBuild" class="section-divider" />
       <SettingVersion />
+      <SettingDataDir />
       <Divider class="section-divider" />
       <SettingAbout />
     </div>
@@ -39,11 +41,11 @@ onMounted(() => {
 
 <style scoped>
 .settings-page {
-  @apply flex flex-col rounded-xl border border-slate-200/60 bg-white/80 backdrop-blur-sm dark:border-slate-700/60 dark:bg-slate-800/80 p-6;
+  @apply flex flex-col rounded-xl border border-slate-200/60 bg-white/80 p-4 backdrop-blur-sm dark:border-slate-700/60 dark:bg-slate-800/80;
 }
 
 .settings-header {
-  @apply pb-4 border-b border-slate-200 dark:border-slate-700;
+  @apply border-b border-slate-200 pb-4 dark:border-slate-700;
 }
 
 .settings-title {
@@ -51,10 +53,10 @@ onMounted(() => {
 }
 
 .settings-content {
-  @apply pt-6;
+  @apply flex flex-col pt-2;
 }
 
 .section-divider {
-  @apply my-4;
+  @apply my-2;
 }
 </style>

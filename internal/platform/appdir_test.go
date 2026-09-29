@@ -168,3 +168,42 @@ func TestDataDirEnvOverridesClientConfig(t *testing.T) {
 		t.Errorf("DataDir() = %q, want %q", dir, want)
 	}
 }
+
+func TestIsDefaultDataDir(t *testing.T) {
+	base := t.TempDir()
+	setupEnv(t, base)
+
+	if !IsDefaultDataDir() {
+		t.Error("IsDefaultDataDir() = false, want true for the built-in location")
+	}
+}
+
+func TestIsDefaultDataDirEnvOverride(t *testing.T) {
+	base := t.TempDir()
+	setupEnv(t, base)
+	t.Setenv("PROCHUB_DATA_ROOT", filepath.Join(base, "custom-data"))
+
+	if IsDefaultDataDir() {
+		t.Error("IsDefaultDataDir() = true, want false for an env override")
+	}
+}
+
+func TestIsDefaultDataDirClientConfigOverride(t *testing.T) {
+	base := t.TempDir()
+	setupEnv(t, base)
+	writeTestClientConfig(t, filepath.Join(base, appDirName, clientConfigName), `{"dataRoot": "~/custom-client-data"}`)
+
+	if IsDefaultDataDir() {
+		t.Error("IsDefaultDataDir() = true, want false for a client.json override")
+	}
+}
+
+func TestIsDefaultDataDirEnvEqualsDefault(t *testing.T) {
+	base := t.TempDir()
+	setupEnv(t, base)
+	t.Setenv("PROCHUB_DATA_ROOT", filepath.Join(base, appDirName, dataDirName))
+
+	if !IsDefaultDataDir() {
+		t.Error("IsDefaultDataDir() = false, want true when the override points at the default path")
+	}
+}

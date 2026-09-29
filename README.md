@@ -56,6 +56,34 @@ Theme, language, auto-start on boot, version update, and about are managed on th
 - Real-time log streaming
 - Separate stdout/stderr capture
 
+### CLI
+
+ProcHub ships with a command line interface in the same executable. Running the
+binary without a known subcommand starts the GUI as usual; passing a subcommand
+runs the CLI, which talks to the running app through a local control endpoint
+(port and token are published to `auth.json` in the data directory on startup).
+
+```bash
+# Create a `prochub` command pointing at the installed app (macOS)
+make cli
+
+prochub process list                       # list all processes
+prochub process start <id>                 # start a process
+prochub process stop <id>                  # stop a process
+prochub process logs <id> --tail 200       # show the last 200 log lines
+prochub process logs <id> --follow         # stream new log lines
+prochub config get                         # show settings
+prochub config set theme light|dark        # set the light/dark theme
+prochub config set language zh|en          # set the UI language
+prochub config set autostart on|off        # toggle auto-start on boot
+prochub config set autostart-wsl on|off    # toggle auto-starting WSL on boot
+prochub status                             # show app status
+prochub version                            # show the version
+```
+
+Process log files are stored under the data directory (`<dataDir>/<logDir>/<id>`),
+so `logs` also works while the GUI is open.
+
 ## Build
 
 ### Prerequisites

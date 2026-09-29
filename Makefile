@@ -13,18 +13,19 @@ INSTALLER_IDENTITY   ?= "3rd Party Mac Developer Installer"
 LOCAL_SIGN_IDENTITY  ?= $(shell security find-identity -v -p codesigning 2>/dev/null | awk '/Developer ID Application:/{print $$2; exit}')
 
 # 
-.PHONY: help dev build clean install check-deps build-and-install update-version
+.PHONY: help dev build clean install check-deps update-version cli
 
 # Default target
 help:
 	@echo "Available targets:"
 	@echo "  dev      - Start the development server"
 	@echo "  build    - Build the application"
-	@echo "  build-and-install - Build, sign locally (Developer ID, no notarization), install to /Applications"
+# 
 	@echo "  clean    - Clean build artifacts"
 	@echo "  install  - Install dependencies"
 	@echo "  check-deps - Check if required tools are installed"
-	@echo "  update-version - Update version across all sources (make update-version VERSION=0.7.0)"
+	@echo "  update-version - Update version across all sources (make update-version 0.7.0)"
+	@echo "  cli      - Symlink the installed app as 'prochub' into PATH for CLI usage"
 
 # Check if required tools are installed
 check-deps:
@@ -55,10 +56,16 @@ build-devtools: check-deps
 # 
 
 # Update version across all sources (app.go, package.json, package-lock.json, screenshot mock)
-# Usage: make update-version VERSION=0.7.0
+# Usage: make update-version 0.7.0
+# The version is passed as a positional argument, so declare it as a no-op target.
+ifneq ($(word 2,$(MAKECMDGOALS)),)
+$(eval $(word 2,$(MAKECMDGOALS)): ; @true)
+endif
+
 update-version:
-	@test -n "$(VERSION)" || { echo "Usage: make update-version VERSION=0.7.0"; exit 1; }
-	bash scripts/update-version.sh "$(VERSION)"
+	@V="$(word 2,$(MAKECMDGOALS))"; \
+	test -n "$$V" || { echo "Usage: make update-version 0.7.0"; exit 1; }; \
+	bash scripts/update-version.sh "$$V"
 
 # Clean build artifacts
 clean:
@@ -67,32 +74,8 @@ clean:
 	rm -rf frontend/node_modules
 	go clean
 
-# Build the app, sign it locally (Developer ID cert if available, otherwise ad-hoc),
-# then install it into /Applications and launch. No Apple notarization is performed.
-build-and-install: check-deps
-	$(MAKE) install
-	$(MAKE) build
-	@if [ -z "$(LOCAL_SIGN_IDENTITY)" ]; then \
-		echo ">>> No Developer ID certificate found, falling back to ad-hoc signing"; \
-		codesign --force --deep --sign - $(APP_PATH); \
-	else \
-		echo ">>> Signing $(APP_PATH) with '$(LOCAL_SIGN_IDENTITY)' (local only, no notarization)"; \
-		codesign --force --deep --sign "$(LOCAL_SIGN_IDENTITY)" $(APP_PATH); \
-	fi
-	codesign --verify --deep --strict --verbose=2 $(APP_PATH)
-	@echo ">>> Stopping running ProcHub instances"
-	pkill -f '/ProcHub.app' 2>/dev/null || true
-	@echo ">>> Installing to /Applications/ProcHub.app"
-	@rm -rf /Applications/ProcHub.app; \
-	if cp -R $(APP_PATH) /Applications/ProcHub.app; then \
-		echo ">>> Installed to /Applications/ProcHub.app (no sudo needed)"; \
-	else \
-		echo ">>> /Applications not writable by current user, retrying with sudo..."; \
-		sudo rm -rf /Applications/ProcHub.app; \
-		sudo cp -R $(APP_PATH) /Applications/ProcHub.app; \
-	fi
-	codesign --verify --deep --strict --verbose=2 /Applications/ProcHub.app
-	@echo ">>> Done. Launching ProcHub..."
-	open /Applications/ProcHub.app
+# 
+
+# 
 
 # 

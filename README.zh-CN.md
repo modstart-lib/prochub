@@ -56,6 +56,30 @@ ProcHub 是一个跨平台的桌面进程管理应用，使用 Wails、Go 和 Vu
 - 实时日志流
 - 分离的 stdout/stderr 捕获
 
+## 命令行工具
+
+ProcHub 在同一可执行文件中内置了命令行工具：不带子命令启动时照常打开界面，带子命令时执行 CLI，并通过本地控制接口与运行中的应用通信（启动时会把端口与令牌写入数据目录的 `auth.json`）。
+
+```bash
+# 创建 prochub 命令，指向已安装的应用（macOS）
+make cli
+
+prochub process list                       # 列出全部进程
+prochub process start <id>                 # 启动进程
+prochub process stop <id>                  # 停止进程
+prochub process logs <id> --tail 200       # 查看最后 200 行日志
+prochub process logs <id> --follow         # 持续输出新增日志
+prochub config get                         # 查看当前配置
+prochub config set theme light|dark        # 设置明暗主题
+prochub config set language zh|en          # 设置界面语言
+prochub config set autostart on|off        # 设置开机自动启动
+prochub config set autostart-wsl on|off    # 设置开机自动启动 WSL
+prochub status                             # 查看运行状态
+prochub version                            # 查看版本
+```
+
+进程日志文件保存在数据目录（`<dataDir>/<logDir>/<id>`），因此界面打开时也可用 `logs` 读取。
+
 ## 构建
 
 ### 环境要求

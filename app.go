@@ -11,9 +11,11 @@ import (
 	"path/filepath"
 	goruntime "runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"prochub/internal/config"
+	"prochub/internal/control"
 	"prochub/internal/logging"
 	"prochub/internal/platform"
 	"prochub/internal/process"
@@ -31,16 +33,24 @@ const (
 
 // App struct
 type App struct {
-	ctx          context.Context
-	pm           *process.Manager
-	store        *store.Store
-	config       config.AppConfig
-	logHub       *logging.StreamHub
-	loggers      map[string]*ProcessLogger
-	autoStartMgr *service.AutoStartManager
-	wslMgr       *service.WSLManager
-	systemLogger *logging.RollingStore
-	dataDir      string
+	ctx           context.Context
+	pm            *process.Manager
+	store         *store.Store
+	config        config.AppConfig
+	logHub        *logging.StreamHub
+	loggers       map[string]*ProcessLogger
+	autoStartMgr  *service.AutoStartManager
+	wslMgr        *service.WSLManager
+	controlServer *control.Server
+	systemLogger  *logging.RollingStore
+	dataDir       string
+	// configMu serializes configuration writes. Reads and writes can originate
+	// from the GUI, the CLI control server and the tray at the same time, so
+	// every read-modify-write sequence must hold this lock to avoid lost
+	// updates when two callers patch different fields concurrently.
+	configMu sync.Mutex
+	// processMu serializes process definition writes for the same reason.
+	processMu sync.Mutex
 }
 
 // ProcessLogger holds the logger for a specific process
@@ -138,6 +148,9 @@ func (a *App) startup(ctx context.Context) {
 		}
 	}
 
+	// Start the local control server used by the CLI.
+	a.startControlServer()
+
 	// Boot WSL on start-up when both app auto-start and WSL auto-start are enabled.
 	if a.config.AutoStartWSL {
 		go a.startWSLOnBoot()
@@ -157,6 +170,9 @@ func (a *App) Greet(name string) string {
 
 // AddProcess registers a new process
 func (a *App) AddProcess(def process.Definition) error {
+	a.processMu.Lock()
+	defer a.processMu.Unlock()
+
 	// Generate ID if not provided
 	if def.ID == "" {
 		def.ID = fmt.Sprintf("proc-%d", len(a.config.Processes)+1)
@@ -177,13 +193,16 @@ func (a *App) AddProcess(def process.Definition) error {
 		hub:   logging.NewStreamHub(100),
 	}
 
-	// Add to config and save
-	a.config.Processes = append(a.config.Processes, def)
-	err := a.store.Save(a.config)
-	if err != nil {
+	// Add to config and persist through the single write path so the change is
+	// broadcast to the frontend.
+	cfg := a.config
+	cfg.Processes = append(cfg.Processes, def)
+	if err := a.applyConfig(cfg, originGUI); err != nil {
 		a.LogSystemError("AddProcess", fmt.Sprintf("Failed to save config after adding process %s: %v", def.Name, err))
+		return err
 	}
-	return err
+	a.notifyProcessesChanged()
+	return nil
 }
 
 // RemoveProcess removes a process by ID
@@ -197,65 +216,75 @@ func (a *App) RemoveProcess(id string) error {
 	// Unregister from process manager
 	a.pm.Unregister(id)
 
-	// Remove from config
-	newProcesses := make([]process.Definition, 0)
-	for _, p := range a.config.Processes {
+	// Remove from config (lock only the read-modify-write of the config)
+	a.processMu.Lock()
+	cfg := a.config
+	newProcesses := make([]process.Definition, 0, len(cfg.Processes))
+	for _, p := range cfg.Processes {
 		if p.ID != id {
 			newProcesses = append(newProcesses, p)
 		}
 	}
-	a.config.Processes = newProcesses
+	cfg.Processes = newProcesses
 
 	// Remove logger
 	delete(a.loggers, id)
+	a.processMu.Unlock()
 
-	err = a.store.Save(a.config)
-	if err != nil {
+	if err := a.applyConfig(cfg, originGUI); err != nil {
 		a.LogSystemError("RemoveProcess", fmt.Sprintf("Failed to save config after removing process %s: %v", id, err))
+		return err
 	}
-	return err
+	a.notifyProcessesChanged()
+	return nil
 }
 
 // UpdateProcess updates a process configuration
 func (a *App) UpdateProcess(id string, def process.Definition) error {
-	// Stop the process first
+	// Stop the process first (kept outside the lock: it can block for seconds)
 	err := a.pm.Stop(id)
 	if err != nil {
 		a.LogSystemError("UpdateProcess", fmt.Sprintf("Failed to stop process %s: %v", id, err))
 	}
 
 	// Update in config
-	for i, p := range a.config.Processes {
+	a.processMu.Lock()
+	cfg := a.config
+	for i, p := range cfg.Processes {
 		if p.ID == id {
 			def.ID = id // Preserve the ID
-			a.config.Processes[i] = def
+			cfg.Processes[i] = def
 			break
 		}
 	}
+	a.processMu.Unlock()
 
 	// Re-register with process manager
 	a.pm.Register(def)
 
-	// Save config
-	err = a.store.Save(a.config)
-	if err != nil {
+	if err := a.applyConfig(cfg, originGUI); err != nil {
 		a.LogSystemError("UpdateProcess", fmt.Sprintf("Failed to save config after updating process %s: %v", id, err))
+		return err
 	}
-	return err
+	a.notifyProcessesChanged()
+	return nil
 }
 
 // SetProcessAutoStart toggles the auto-start flag of a process without
 // stopping or restarting the process if it is currently running.
 func (a *App) SetProcessAutoStart(id string, enabled bool) error {
+	a.processMu.Lock()
+	cfg := a.config
 	found := false
-	for i, p := range a.config.Processes {
+	for i, p := range cfg.Processes {
 		if p.ID == id {
 			p.AutoStart = enabled
-			a.config.Processes[i] = p
+			cfg.Processes[i] = p
 			found = true
 			break
 		}
 	}
+	a.processMu.Unlock()
 	if !found {
 		return fmt.Errorf("process %s not found", id)
 	}
@@ -265,10 +294,11 @@ func (a *App) SetProcessAutoStart(id string, enabled bool) error {
 		return err
 	}
 
-	if err := a.store.Save(a.config); err != nil {
+	if err := a.applyConfig(cfg, originGUI); err != nil {
 		a.LogSystemError("SetProcessAutoStart", fmt.Sprintf("Failed to save config after updating auto-start for process %s: %v", id, err))
 		return err
 	}
+	a.notifyProcessesChanged()
 	return nil
 }
 
@@ -278,6 +308,8 @@ func (a *App) StartProcess(id string) error {
 	if err != nil {
 		a.LogSystemError("StartProcess", fmt.Sprintf("Failed to start process %s: %v", id, err))
 	}
+	// The status change happens asynchronously; let the frontend re-read it.
+	a.notifyProcessesChanged()
 	return err
 }
 
@@ -287,6 +319,7 @@ func (a *App) StopProcess(id string) error {
 	if err != nil {
 		a.LogSystemError("StopProcess", fmt.Sprintf("Failed to stop process %s: %v", id, err))
 	}
+	a.notifyProcessesChanged()
 	return err
 }
 
@@ -300,7 +333,14 @@ func (a *App) RestartProcess(id string) error {
 	if err != nil {
 		a.LogSystemError("RestartProcess", fmt.Sprintf("Failed to start process %s during restart: %v", id, err))
 	}
+	a.notifyProcessesChanged()
 	return err
+}
+
+// notifyProcessesChanged tells the frontend that the process list or the state
+// of some process changed, so it can re-read the list from the backend.
+func (a *App) notifyProcessesChanged() {
+	a.emit("processes:changed", map[string]interface{}{})
 }
 
 // ListProcesses returns all processes with their status
@@ -324,15 +364,7 @@ func (a *App) GetConfig() config.AppConfig {
 
 // UpdateConfig updates the configuration
 func (a *App) UpdateConfig(cfg config.AppConfig) error {
-	oldLocale := a.config.Locale
-	a.config = cfg
-	
-	// Update tray language if locale changed
-	if oldLocale != cfg.Locale {
-		UpdateTrayLanguage()
-	}
-	
-	return a.store.Save(a.config)
+	return a.applyConfig(cfg, originGUI)
 }
 
 // SelectDirectory opens a directory selection dialog
@@ -344,6 +376,28 @@ func (a *App) SelectDirectory() (string, error) {
 		return "", err
 	}
 	return dir, nil
+}
+
+// DataDirInfo describes the effective data directory resolved at runtime.
+type DataDirInfo struct {
+	// Path is the absolute directory where app data is stored.
+	Path string `json:"path"`
+	// IsDefault is true when Path is the built-in default (~/.prochub/data).
+	IsDefault bool `json:"isDefault"`
+}
+
+// GetDataDirInfo returns the effective data directory and whether it is the
+// built-in default, so the UI can warn about a custom location.
+func (a *App) GetDataDirInfo() DataDirInfo {
+	return DataDirInfo{
+		Path:      a.dataDir,
+		IsDefault: platform.IsDefaultDataDir(),
+	}
+}
+
+// OpenDataDir opens the effective data directory in the system file manager.
+func (a *App) OpenDataDir() error {
+	return platform.RevealPath(a.dataDir)
 }
 
 // SelectFile opens a file selection dialog for selecting executable/command
@@ -364,23 +418,7 @@ func (a *App) GetAutoStartEnabled() (bool, error) {
 
 // SetAutoStartEnabled enables or disables auto-start
 func (a *App) SetAutoStartEnabled(enabled bool) error {
-	if enabled {
-		if err := a.autoStartMgr.Enable(); err != nil {
-			return err
-		}
-	} else {
-		if err := a.autoStartMgr.Disable(); err != nil {
-			return err
-		}
-	}
-
-	// Persist the flag so the WSL auto-start option can rely on it.
-	a.config.AutoStart = enabled
-	if err := a.store.Save(a.config); err != nil {
-		a.LogSystemError("SetAutoStartEnabled", fmt.Sprintf("Failed to save config: %v", err))
-		return err
-	}
-	return nil
+	return a.patchConfig(func(cfg *config.AppConfig) { cfg.AutoStart = enabled }, originGUI)
 }
 
 // GetAutoStartWSLEnabled returns whether WSL should start together with the app.
@@ -391,12 +429,7 @@ func (a *App) GetAutoStartWSLEnabled() bool {
 // SetAutoStartWSLEnabled enables or disables starting WSL on boot. The option
 // only takes effect while the application auto-start option is enabled.
 func (a *App) SetAutoStartWSLEnabled(enabled bool) error {
-	a.config.AutoStartWSL = enabled
-	if err := a.store.Save(a.config); err != nil {
-		a.LogSystemError("SetAutoStartWSLEnabled", fmt.Sprintf("Failed to save config: %v", err))
-		return err
-	}
-	return nil
+	return a.patchConfig(func(cfg *config.AppConfig) { cfg.AutoStartWSL = enabled }, originGUI)
 }
 
 // GetWSLStatus returns the current WSL runtime status.
@@ -460,7 +493,7 @@ func (a *App) GetSystemVersion() map[string]string {
 	info["os"] = goruntime.GOOS
 	info["arch"] = goruntime.GOARCH
 	info["platform"] = a.autoStartMgr.GetPlatform()
-	
+
 	// Get OS version based on platform
 	var cmd *exec.Cmd
 	switch goruntime.GOOS {
@@ -475,7 +508,7 @@ func (a *App) GetSystemVersion() map[string]string {
 	case "windows":
 		cmd = exec.Command("cmd", "/c", "ver")
 	}
-	
+
 	if cmd != nil {
 		if output, err := cmd.Output(); err == nil {
 			info["osVersion"] = strings.TrimSpace(string(output))
@@ -483,15 +516,15 @@ func (a *App) GetSystemVersion() map[string]string {
 			info["osVersion"] = "unknown"
 		}
 	}
-	
+
 	// Get hostname
 	if hostname, err := os.Hostname(); err == nil {
 		info["hostname"] = hostname
 	}
-	
+
 	info["goVersion"] = goruntime.Version()
 	info["numCPU"] = fmt.Sprintf("%d", goruntime.NumCPU())
-	
+
 	return info
 }
 
@@ -511,32 +544,32 @@ func (a *App) LogSystemError(component, message string) {
 // GetSystemLogs returns system logs from the last 24 hours
 func (a *App) GetSystemLogs() (string, error) {
 	var logs strings.Builder
-	
+
 	// Collect application system logs
 	dataDir := a.dataDir
 	if dataDir == "" {
 		dataDir = platform.MustDataDir()
 	}
 	systemLogDir := filepath.Join(dataDir, "system_logs")
-	
+
 	logs.WriteString("=== Application System Logs ===\n")
 	if entries, err := os.ReadDir(systemLogDir); err == nil {
 		now := time.Now()
 		yesterday := now.Add(-24 * time.Hour)
-		
+
 		totalSize := 0
 		maxSize := 500 * 1024 // Limit to 500KB of logs
-		
+
 		for _, entry := range entries {
 			if entry.IsDir() {
 				continue
 			}
-			
+
 			info, err := entry.Info()
 			if err != nil {
 				continue
 			}
-			
+
 			// Only include logs from last 24 hours
 			if info.ModTime().After(yesterday) {
 				filePath := filepath.Join(systemLogDir, entry.Name())
@@ -553,14 +586,14 @@ func (a *App) GetSystemLogs() (string, error) {
 				}
 			}
 		}
-		
+
 		if totalSize == 0 {
 			logs.WriteString("No system logs found in the last 24 hours\n")
 		}
 	} else {
 		logs.WriteString(fmt.Sprintf("Unable to read system logs directory: %v\n", err))
 	}
-	
+
 	return logs.String(), nil
 }
 
@@ -603,24 +636,24 @@ const baseURL = "https://open.tecmz.com/open_app/ProcHub"
 
 // AppConfig holds application-wide configuration
 var appConfig = struct {
-	Name        string
-	Title       string
-	Slogan      string
-	Version     string
-	Website     string
-	WebsiteGithub string
-	WebsiteGitee  string
-	ApiBaseUrl    string
-	AnalyticsUrl  string
+	Name            string
+	Title           string
+	Slogan          string
+	Version         string
+	Website         string
+	WebsiteGithub   string
+	WebsiteGitee    string
+	ApiBaseUrl      string
+	AnalyticsUrl    string
 	VersionCheckUrl string
-	FeedbackUrl   string
-	GuideUrl      string
-	HelpUrl       string
+	FeedbackUrl     string
+	GuideUrl        string
+	HelpUrl         string
 }{
 	Name:            "ProcHub",
 	Title:           "ProcHub",
 	Slogan:          "Manage processes easily",
-	Version:         "0.6.0",
+	Version:         "0.7.0-beta",
 	Website:         baseURL,
 	WebsiteGithub:   "https://github.com/modstart-lib/prochub",
 	WebsiteGitee:    "https://gitee.com/modstart-lib/prochub",
@@ -643,8 +676,8 @@ func (a *App) getDeviceUUID() string {
 	newUUID := uuid.New().String()
 	a.config.DeviceUUID = newUUID
 
-	// Save to config
-	a.store.Save(a.config)
+	// Persist through the single write path.
+	_ = a.applyConfig(a.config, originGUI)
 
 	return newUUID
 }
@@ -910,12 +943,15 @@ func (a *App) CheckVersion() (VersionInfo, error) {
 
 // shutdown is called when the app is closing
 func (a *App) shutdown(ctx context.Context) {
+	// Stop the CLI control server and remove its auth file
+	a.stopControlServer()
+
 	// Log shutdown
 	a.LogSystemError("shutdown", "Application is shutting down")
-	
+
 	// Stop all running processes gracefully
 	a.pm.StopAll()
-	
+
 	// Final log
 	a.LogSystemError("shutdown", "Application shutdown complete")
 }

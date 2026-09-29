@@ -5,6 +5,7 @@ import { onMounted, onUnmounted, ref } from 'vue';
 import { checkVersionAndPrompt, getAppVersion, isAppStoreBuild } from '../../services/version';
 import { useAppStore } from '../../stores/app';
 import { testActionSet, testActionUnset } from '../../utils/test';
+import SettingSection from './SettingSection.vue';
 
 const appStore = useAppStore()
 const appVersion = ref('')
@@ -33,73 +34,30 @@ const handleCheckVersion = async () => {
 </script>
 
 <template>
-  <div class="setting-section">
-    <div class="section-header">
-      <div class="section-icon version-icon">
-        <RefreshCw :size="18" />
-      </div>
-      <div class="section-info">
-        <h3 class="section-title">{{ appStore.t('settings.version.title') }}</h3>
-        <p class="section-desc">{{ appStore.t('settings.version.desc') }}</p>
-      </div>
-    </div>
-    <div class="section-control">
-      <div class="version-control">
-        <span class="current-version">{{ appStore.t('settings.version.currentVersion') }}: {{ appVersion }}</span>
-        <Button
-          v-if="!isAppStoreBuild"
-          type="primary"
-          size="small"
-          :loading="versionChecking"
-          @click="handleCheckVersion"
-        >
-          <template #icon>
-            <RefreshCw :size="14" v-if="!versionChecking" />
-          </template>
-          {{ versionChecking ? appStore.t('settings.version.checking') : appStore.t('settings.version.checkUpdate') }}
-        </Button>
-      </div>
-    </div>
-  </div>
+  <SettingSection :title="appStore.t('settings.version.title')" :desc="appStore.t('settings.version.desc')">
+    <template #icon>
+      <RefreshCw class="w-5 h-5" aria-hidden="true" />
+    </template>
+    <template #control>
+      <span class="current-version">
+        {{ appStore.t('settings.version.currentVersion') }}: {{ appVersion }}
+      </span>
+      <Button
+        v-if="!isAppStoreBuild"
+        type="primary"
+        :loading="versionChecking"
+        @click="handleCheckVersion"
+      >
+        <template #icon>
+          <RefreshCw v-if="!versionChecking" class="w-4 h-4" aria-hidden="true" />
+        </template>
+        {{ versionChecking ? appStore.t('settings.version.checking') : appStore.t('settings.version.checkUpdate') }}
+      </Button>
+    </template>
+  </SettingSection>
 </template>
 
 <style scoped>
-.setting-section {
-  @apply flex flex-row items-center justify-between gap-4;
-}
-
-.section-header {
-  @apply flex items-center gap-3;
-}
-
-.section-icon {
-  @apply flex h-10 w-10 items-center justify-center rounded-lg;
-}
-
-.version-icon {
-  @apply bg-purple-100 text-purple-600 dark:bg-purple-900/50 dark:text-purple-400;
-}
-
-.section-info {
-  @apply flex flex-col;
-}
-
-.section-title {
-  @apply text-sm font-semibold text-slate-800 dark:text-slate-200;
-}
-
-.section-desc {
-  @apply text-xs text-slate-500 dark:text-slate-400;
-}
-
-.section-control {
-  @apply flex items-center;
-}
-
-.version-control {
-  @apply flex items-center gap-3;
-}
-
 .current-version {
   @apply text-xs text-slate-500 dark:text-slate-400;
 }

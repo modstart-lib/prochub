@@ -1,5 +1,34 @@
 # Changelog
 
+## [unreleased]
+
+- 新增：设置页在生效数据目录非默认（`PROCHUB_DATA_ROOT` 或 `client.json` 的 `dataRoot` 覆盖）时，显示实际运行路径并支持一键打开定位到该目录
+- 新增：新增 `DESIGN.md` 设计规范，统一颜色令牌、圆角、间距、字体、组件与深色模式约定
+- 优化：深色模式改由 `ConfigProvider` 主题统一驱动，移除 `style.css` 中 30 余条 `.dark .ant-* !important` 双重覆盖，深色主色统一为 `#34d399`
+- 优化：界面字体改为系统原生字体栈，移除 Google Fonts CDN 外链，避免离线或受限网络下加载失败
+- 优化：设置页分区图标统一为 Emerald 配色（移除 indigo/green/purple/blue 混用），并修复主题切换按钮中永不生效的 indigo 覆盖
+- 优化：设置页拆分复用 `SettingSection` 组件，统一图标底块、标题、间距与右对齐；「关于」改为与其他分区一致的行式布局，工单反馈弹窗改为响应式宽度并移除 iframe 负边距 hack
+- 优化：进程卡片抽取为独立 `ProcessCard.vue`，进程页收敛为单一页面容器（统计区并入），页面标题字号统一
+- 优化：新增/编辑进程弹窗抽取共用 `ProcessFormTabs.vue`，消除约 150 行重复模板与样式；弹窗宽度改为响应式 `min(600px, 90vw)` / `95vw`
+- 优化：统一空状态组件 `AppEmptyState.vue`、统一使用 `<a-input-search />`，移除全部 `size="small"` 按钮与 `type="text"` 删除按钮，操作图标统一 `w-4 h-4` + `aria-hidden`
+- 优化：日志弹窗头部与工具栏左右内边距统一，行数文案改为「共 N 行」
+- 修复：修复重启策略、工单反馈、错误标签、进程计数等硬编码文案未走 i18n 的问题
+- 修复：清理未使用的 Nunito 字体文件、tailwind `display/body` 字体族与 `brand-*` 颜色等死配置；`AppLogo` 补齐圆角底避免深色模式下对比度不足
+- 修复：`index.html` 增加首屏主题脚本，避免深色模式启动闪白
+- 测试：`tests/run.ts` 首次构建等待超时放宽至 10 分钟，并忽略 `ResizeObserver loop` 无害告警
+- 截图：更新 demo 截图以反映新视觉
+- 优化：端口规范化为 53090 段（53090 自动化测试端口 / 53091 前端开发端口 / 53092 截图端口 / 53093 CLI 控制接口端口），避免与其他程序调试时端口冲突。
+- 新增：命令行工具（与主程序同一可执行文件，无参启动界面，带子命令时执行 CLI）：`process list/start/stop/logs`（日志支持 `--tail`/`--follow`）、`config get/set theme|language|autostart|autostart-wsl`、`status`、`version`，通过启动时写入数据目录的 `auth.json`（端口 + 令牌）与运行中的应用通信
+- 新增：应用启动时在 `127.0.0.1:53093` 启动本地控制接口（携带令牌鉴权），退出时自动清理 `auth.json`
+- 新增：主题改为后端配置存储（`AppConfig.theme`），新增 `SetTheme`/`SetLocale` 接口并统一配置写入路径；CLI 或外部变更主题/语言时通过事件实时同步到界面
+- 优化：统一 `applyConfig` 为唯一配置写入路径（持久化 + 开机自启副作用 + 托盘语言刷新 + 界面事件通知），消除各处分散保存逻辑
+- 测试：新增 `internal/control`、`internal/cli`、`internal/logging` 的控制接口与命令行测试
+- 优化：配置变更改由后端统一广播全量 `config:changed` 事件（携带完整配置与变更来源），前端 Store 集中承接，CLI/托盘等外部来源改动主题、语言、开机自启后界面即刻同步
+- 新增：进程列表或状态变更时广播 `processes:changed` 事件，CLI 启停进程后界面自动刷新为最新状态
+- 优化：配置与进程写入全部收敛到 `applyConfig` 单一写入路径，消除 `AddProcess`、`RemoveProcess`、`UpdateProcess`、`SetProcessAutoStart`、设备 UUID 等处的旁路保存
+- 修复：CLI 并发修改不同配置项时相互覆盖（读改写丢失更新），配置与进程写入增加互斥锁保护，并通过 `-race` 全量校验
+- 重构：开机自启/WSL 自启状态由界面组件局部 ref 上移到 Store，移除脆弱的回调注册桥接
+
 ## v0.6.0 Windows 托盘交互优化，WSL 自动启动，数据目录配置增强
 
 - 新增：Windows 下单击托盘图标直接显示主界面，右键才弹出托盘菜单

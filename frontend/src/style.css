@@ -1,9 +1,13 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Design tokens live here and in App.vue's ConfigProvider.
+ * Ant components are themed through ConfigProvider (see App.vue); do NOT
+ * re-skin Ant internals with !important overrides — only brand-level and
+ * layout-level rules belong in this file.
+ */
 :root {
   color-scheme: light;
   --primary-color: #10b981;
@@ -25,7 +29,8 @@ body {
   margin: 0;
   padding: 0;
   height: 100%;
-  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
   background-color: #f8fafc;
   color: #0f172a;
   -webkit-font-smoothing: antialiased;
@@ -53,6 +58,8 @@ body {
   height: 100vh;
   overflow: hidden;
 }
+
+/* ── Layout ─────────────────────────────────────────────────────────────── */
 
 .app-shell {
   display: flex;
@@ -94,52 +101,47 @@ body {
   gap: 8px;
 }
 
-.tab-button {
+/* Sidebar navigation built on Ant Button, kept visually as a vertical tab. */
+.tab-button.ant-btn {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 8px 8px;
+  padding: 10px 8px;
   width: 100%;
+  height: auto;
   border: none;
   background: transparent;
+  box-shadow: none;
   color: #64748b;
   border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
   font-size: 13px;
   font-weight: 500;
 }
 
-.tab-button svg {
-  flex-shrink: 0;
-  min-width: 20px;
-}
-
-.tab-button:hover {
+.tab-button.ant-btn:hover {
   background: rgba(16, 185, 129, 0.1);
   color: #10b981;
 }
 
-.tab-button.active {
+.tab-button.ant-btn.active {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  color: white;
+  color: #ffffff;
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
-.dark .tab-button {
+.dark .tab-button.ant-btn {
   color: #94a3b8;
 }
 
-.dark .tab-button:hover {
+.dark .tab-button.ant-btn:hover {
   background: rgba(16, 185, 129, 0.15);
   color: #34d399;
 }
 
-.dark .tab-button.active {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  color: white;
+.dark .tab-button.ant-btn.active {
+  color: #ffffff;
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
 }
 
@@ -174,39 +176,56 @@ body {
   min-height: 0;
 }
 
-/* Ant Design 主题覆盖 */
-.ant-btn-primary {
-  background-color: var(--primary-color) !important;
-  border-color: var(--primary-color) !important;
+/* ── Brand ──────────────────────────────────────────────────────────────── */
+
+.logo-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
 }
 
-.ant-btn-primary:hover {
-  background-color: var(--primary-hover) !important;
-  border-color: var(--primary-hover) !important;
+.logo-image {
+  width: 40px;
+  height: 40px;
 }
 
-/* 修复按钮图标居中 */
+.logo-text {
+  font-size: 16px;
+  font-weight: 700;
+  color: #10b981;
+}
+
+.dark .logo-text {
+  color: #34d399;
+}
+
+/* ── Button content layout ───────────────────────────────────────────────
+ * Ant v4 renders the icon slot and the label as inline boxes; this keeps them
+ * vertically centred and on a single line. Structural normalisation, not a
+ * theme override.
+ */
 .ant-btn {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 6px !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
 }
 
-.ant-btn>.ant-btn-icon {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
+.ant-btn > .ant-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.ant-btn>span {
-  display: inline-flex !important;
-  align-items: center !important;
+.ant-btn > span {
+  display: inline-flex;
+  align-items: center;
 }
 
-.ant-switch-checked {
-  background-color: var(--primary-color) !important;
-}
+/* ── Status tags (brand-specific look) ──────────────────────────────────── */
 
 .ant-tag-success {
   color: #10b981 !important;
@@ -226,114 +245,8 @@ body {
   border-color: rgba(100, 116, 139, 0.3) !important;
 }
 
-/* 深色模式下的 Ant Design 样式 */
-.dark .ant-modal-content {
-  background-color: #1e293b !important;
-}
+/* ── Scrollbar ──────────────────────────────────────────────────────────── */
 
-.dark .ant-modal-header {
-  background-color: #1e293b !important;
-  border-bottom-color: #334155 !important;
-}
-
-.dark .ant-modal-title {
-  color: #f1f5f9 !important;
-}
-
-.dark .ant-modal-close-x {
-  color: #94a3b8 !important;
-}
-
-.dark .ant-form-item-label>label {
-  color: #e2e8f0 !important;
-}
-
-.dark .ant-input {
-  background-color: #0f172a !important;
-  border-color: #334155 !important;
-  color: #f1f5f9 !important;
-}
-
-.dark .ant-input::placeholder {
-  color: #64748b !important;
-}
-
-.dark .ant-select-selector {
-  background-color: #0f172a !important;
-  border-color: #334155 !important;
-  color: #f1f5f9 !important;
-}
-
-.dark .ant-select-arrow {
-  color: #64748b !important;
-}
-
-.dark .ant-input-number {
-  background-color: #0f172a !important;
-  border-color: #334155 !important;
-}
-
-.dark .ant-input-number-input {
-  color: #f1f5f9 !important;
-}
-
-.dark .ant-tabs-tab {
-  color: #94a3b8 !important;
-}
-
-.dark .ant-tabs-tab-active .ant-tabs-tab-btn {
-  color: var(--primary-color) !important;
-}
-
-.dark .ant-tabs-ink-bar {
-  background-color: var(--primary-color) !important;
-}
-
-.dark .ant-divider {
-  border-color: #334155 !important;
-}
-
-.dark .ant-card {
-  background-color: #1e293b !important;
-  border-color: #334155 !important;
-}
-
-.dark .ant-card-head {
-  border-bottom-color: #334155 !important;
-  color: #f1f5f9 !important;
-}
-
-.dark .ant-radio-button-wrapper {
-  background-color: #0f172a !important;
-  border-color: #334155 !important;
-  color: #94a3b8 !important;
-}
-
-.dark .ant-radio-button-wrapper-checked {
-  background-color: #10b981 !important;
-  border-color: #10b981 !important;
-  color: white !important;
-}
-
-.ant-radio-button-wrapper-checked {
-  background-color: #10b981 !important;
-  border-color: #10b981 !important;
-  color: white !important;
-}
-
-.dark .ant-empty-description {
-  color: #64748b !important;
-}
-
-.dark .ant-popover-inner {
-  background-color: #1e293b !important;
-}
-
-.dark .ant-popover-message-title {
-  color: #f1f5f9 !important;
-}
-
-/* 滚动条样式 */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -360,7 +273,8 @@ body {
   background: #64748b;
 }
 
-/* 动画 */
+/* ── Motion ─────────────────────────────────────────────────────────────── */
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -377,32 +291,12 @@ body {
   animation: fadeIn 0.3s ease-out;
 }
 
-/* 禁用拖拽区域 */
+/* ── Window drag regions ────────────────────────────────────────────────── */
+
 .titlebar-btn {
   -webkit-app-region: no-drag;
 }
 
 .ant-dropdown {
   -webkit-app-region: no-drag;
-}
-
-.logo-area {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 24px;
-}
-
-.logo-image {
-  width: 40px;
-  height: 40px;
-}
-
-.logo-text {
-  font-size: 16px;
-  font-weight: 700;
-  background: linear-gradient(135deg, #10b981 0%, #2563eb 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
 }

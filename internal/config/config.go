@@ -4,6 +4,7 @@ import "prochub/internal/process"
 
 type AppConfig struct {
 	Locale        string               `json:"locale"`
+	Theme         string               `json:"theme"`
 	AutoStart     bool                 `json:"autoStart"`
 	AutoStartWSL  bool                 `json:"autoStartWSL"`
 	LogDir        string               `json:"logDir"`
@@ -18,6 +19,7 @@ type AppConfig struct {
 func DefaultConfig() AppConfig {
 	return AppConfig{
 		Locale:        "zh",
+		Theme:         "light",
 		AutoStart:     false,
 		LogDir:        "logs",
 		MaxLogLines:   1000,

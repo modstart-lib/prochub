@@ -81,6 +81,18 @@ export default {
       errored: 'Errored',
       starting: 'Starting',
     },
+    restartPolicies: {
+      always: 'Always',
+      onFailure: 'On Failure',
+      never: 'Never',
+    },
+    env: {
+      key: 'Key',
+      value: 'Value',
+    },
+    pickCommand: 'Select command file',
+    pickWorkingDir: 'Select working directory',
+    count: '{count} total',
     empty: 'No processes found',
   },
   messages: {
@@ -105,6 +117,8 @@ export default {
     filterErrors: 'Show errors only',
     scrollToBottom: 'Scroll to bottom',
     download: 'Download logs',
+    errorLabel: 'Error:',
+    lineCount: '{count} lines',
     empty: 'No logs available',
   },
   settings: {
@@ -113,6 +127,7 @@ export default {
     language: 'Language',
     about: 'About',
     aboutDesc: 'ProcHub - cross-platform process manager',
+    feedback: 'Feedback',
     theme: {
       title: 'Theme',
       desc: 'Choose your preferred theme',
@@ -148,6 +163,11 @@ export default {
       currentVersion: 'Current version',
       updateAvailable: 'Update Available',
       updateConfirm: 'New version {version} is available. Open browser to download?',
+    },
+    dataDir: {
+      title: 'Data Directory',
+      desc: 'Custom data location detected. Actual path:',
+      open: 'Open',
     },
     linkCopied: 'Link copied to clipboard',
     linkCopyFailed: 'Failed to copy link',

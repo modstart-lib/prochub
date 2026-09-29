@@ -1,11 +1,12 @@
 <script lang="ts" setup>
-import { Button, Card, Modal } from 'ant-design-vue';
+import { Button, Modal } from 'ant-design-vue';
 import { Globe, Info, MessageSquare } from 'lucide-vue-next';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { GetAppConfig, GetAppName, GetPlatform, GetProcessLogs, GetSystemLogs, GetSystemVersion, ListProcesses } from '../../../wailsjs/go/main/App';
 import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime';
 import { getAppVersion } from '../../services/version';
 import { useAppStore } from '../../stores/app';
+import SettingSection from './SettingSection.vue';
 
 const appStore = useAppStore()
 const feedbackUrl = ref('')
@@ -27,7 +28,7 @@ onUnmounted(() => {
   window.removeEventListener('message', handleFeedbackMessage)
 })
 
-const copyGithubLink = () => {
+const openGithub = () => {
   BrowserOpenURL('https://github.com/modstart-lib/prochub')
 }
 
@@ -102,97 +103,41 @@ const handleFeedbackMessage = async (event: MessageEvent) => {
 </script>
 
 <template>
-  <Card class="about-card" :bordered="false">
-    <template #title>
-      <div class="about-header">
-        <Info :size="16" class="about-icon" />
-        <span>{{ appStore.t('settings.about') }}</span>
-      </div>
+  <SettingSection :title="appStore.t('settings.about')" :desc="appStore.t('settings.aboutDesc')">
+    <template #icon>
+      <Info class="w-5 h-5" aria-hidden="true" />
     </template>
-    <div class="about-content">
-      <p class="about-text">{{ appStore.t('settings.aboutDesc') }}</p>
-      <div class="about-meta">
-        <span
-          class="github-link"
-          @click="copyGithubLink"
-          role="button"
-          tabindex="0"
-        >
-          <Globe :size="14" />
-          github.com/modstart-lib/prochub
-        </span>
-        <Button
-          v-if="feedbackUrl"
-          type="primary"
-          size="small"
-          class="feedback-btn ml-auto"
-          @click="showFeedbackModal = true"
-        >
-          <template #icon>
-            <MessageSquare :size="14" />
-          </template>
-          工单反馈
-        </Button>
-      </div>
-    </div>
-  </Card>
+    <template #control>
+      <Button aria-label="GitHub" @click="openGithub">
+        <template #icon><Globe class="w-4 h-4" aria-hidden="true" /></template>
+        GitHub
+      </Button>
+      <Button v-if="feedbackUrl" type="primary" @click="showFeedbackModal = true">
+        <template #icon><MessageSquare class="w-4 h-4" aria-hidden="true" /></template>
+        {{ appStore.t('settings.feedback') }}
+      </Button>
+    </template>
+  </SettingSection>
 
   <Modal
     v-model:open="showFeedbackModal"
-    title="工单反馈"
+    :title="appStore.t('settings.feedback')"
     :footer="null"
-    width="600px"
-    style="top: 20px"
-    :bodyStyle="{ padding: 0, height: '70vh', overflow: 'visible' }"
+    width="95vw"
+    :body-style="{ padding: 0 }"
   >
-    <div style="width:calc(48px + 100%); height:calc(20px + 100%);overflow:hidden;border-radius:0 0 8px 8px;margin:0px 24px -20px -24px;">
-      <iframe
-        v-if="feedbackUrl"
-        :src="feedbackUrl"
-        style="width: 100%; height: 100%;"
-      ></iframe>
+    <div class="feedback-frame">
+      <iframe v-if="feedbackUrl" :src="feedbackUrl" class="feedback-iframe"></iframe>
     </div>
   </Modal>
 </template>
 
 <style scoped>
-.about-card {
-  @apply rounded-xl bg-slate-50 dark:bg-slate-800/50;
+.feedback-frame {
+  @apply h-[70vh] overflow-hidden;
 }
 
-.about-card :deep(.ant-card-head) {
-  @apply border-b-0 pb-0;
-}
-
-.about-card :deep(.ant-card-body) {
-  @apply pt-2;
-}
-
-.about-header {
-  @apply flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300;
-}
-
-.about-icon {
-  @apply text-slate-500;
-}
-
-.about-content {
-  @apply flex flex-col gap-3;
-}
-
-.about-text {
-  @apply text-sm text-slate-600 dark:text-slate-400 leading-relaxed;
-}
-
-.about-meta {
-  @apply flex items-center gap-2;
-}
-
-.github-link {
-  @apply flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors cursor-pointer;
-}
-
-.feedback-btn {
-  @apply flex items-center gap-1.5 text-xs;
+.feedback-iframe {
+  @apply h-full w-full border-0;
 }
 </style>

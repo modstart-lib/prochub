@@ -1,11 +1,12 @@
 <script lang="ts" setup>
-import { Button, Empty, Input, Modal, Switch, Tooltip } from 'ant-design-vue';
-import { ArrowDown, Download, Filter, RefreshCw, Search, Terminal } from 'lucide-vue-next';
+import { Button, InputSearch, Modal, Switch, Tooltip } from 'ant-design-vue';
+import { ArrowDown, Download, Filter, RefreshCw, Terminal } from 'lucide-vue-next';
 import { computed, nextTick, ref, watch } from 'vue';
 import { SaveLogsToFile } from '../../../wailsjs/go/main/App';
 import { trackVisit } from '../../services/analytics';
 import { useAppStore } from '../../stores/app';
 import { testActionSet } from '../../utils/test';
+import AppEmptyState from '@/components/AppEmptyState.vue';
 
 const props = defineProps<{ 
   visible: boolean
@@ -146,7 +147,7 @@ let refreshInterval: ReturnType<typeof setInterval> | null = null
   <Modal
     :open="props.visible"
     :title="null"
-    width="900px"
+    width="95vw"
     :footer="null"
     class="logs-modal"
     @cancel="emit('update:visible', false)"
@@ -154,56 +155,52 @@ let refreshInterval: ReturnType<typeof setInterval> | null = null
     <!-- 自定义头部 -->
     <div class="logs-header">
       <div class="header-title">
-        <Terminal :size="20" class="title-icon" />
+        <Terminal class="w-5 h-5 title-icon" aria-hidden="true" />
         <span class="title-text">{{ appStore.t('logs.title') }}</span>
         <span class="process-badge">{{ processName }}</span>
       </div>
       <div class="header-stats">
-        <span class="log-count">{{ filteredLogs.length }} {{ appStore.t('logs.lines') || 'lines' }}</span>
+        <span class="log-count">{{ appStore.t('logs.lineCount', { count: filteredLogs.length }) }}</span>
       </div>
     </div>
 
     <!-- 工具栏 -->
     <div class="logs-toolbar">
       <div class="toolbar-left">
-        <Input 
+        <InputSearch
           v-model:value="searchQuery"
-          :placeholder="appStore.t('logs.search') || 'Search logs...'"
+          :placeholder="appStore.t('logs.search')"
           class="search-input"
           allow-clear
-        >
-          <template #prefix>
-            <Search :size="14" class="search-icon" />
-          </template>
-        </Input>
-        <Tooltip :title="appStore.t('logs.filterErrors') || 'Show only errors'">
-          <Button 
+        />
+        <Tooltip :title="appStore.t('logs.filterErrors')">
+          <Button
             :type="showOnlyErrors ? 'primary' : 'default'"
-            size="small"
+            :aria-label="appStore.t('logs.filterErrors')"
             @click="showOnlyErrors = !showOnlyErrors"
           >
-            <template #icon><Filter :size="14" /></template>
+            <Filter class="w-4 h-4" aria-hidden="true" />
           </Button>
         </Tooltip>
       </div>
       <div class="toolbar-right">
         <div class="auto-scroll-toggle">
           <Switch v-model:checked="autoScroll" size="small" />
-          <span class="toggle-label">{{ appStore.t('logs.autoScroll') || 'Auto-scroll' }}</span>
+          <span class="toggle-label">{{ appStore.t('logs.autoScroll') }}</span>
         </div>
-        <Tooltip :title="appStore.t('logs.scrollToBottom') || 'Scroll to bottom'">
-          <Button size="small" @click="scrollToBottom">
-            <template #icon><ArrowDown :size="14" /></template>
+        <Tooltip :title="appStore.t('logs.scrollToBottom')">
+          <Button :aria-label="appStore.t('logs.scrollToBottom')" @click="scrollToBottom">
+            <ArrowDown class="w-4 h-4" aria-hidden="true" />
           </Button>
         </Tooltip>
-        <Tooltip :title="appStore.t('actions.refresh') || 'Refresh'">
-          <Button size="small" @click="loadLogs">
-            <template #icon><RefreshCw :size="14" /></template>
+        <Tooltip :title="appStore.t('actions.refresh')">
+          <Button :aria-label="appStore.t('actions.refresh')" @click="loadLogs">
+            <RefreshCw class="w-4 h-4" aria-hidden="true" />
           </Button>
         </Tooltip>
-        <Tooltip :title="appStore.t('logs.download') || 'Download logs'">
-          <Button size="small" @click="downloadLogs" :disabled="logs.length === 0">
-            <template #icon><Download :size="14" /></template>
+        <Tooltip :title="appStore.t('logs.download')">
+          <Button :disabled="logs.length === 0" :aria-label="appStore.t('logs.download')" @click="downloadLogs">
+            <Download class="w-4 h-4" aria-hidden="true" />
           </Button>
         </Tooltip>
       </div>
@@ -211,11 +208,7 @@ let refreshInterval: ReturnType<typeof setInterval> | null = null
 
     <!-- 日志内容 -->
     <div ref="logContainer" class="logs-container">
-      <Empty 
-        v-if="filteredLogs.length === 0" 
-        :description="appStore.t('logs.empty') || 'No logs available'"
-        class="logs-empty"
-      />
+      <AppEmptyState v-if="filteredLogs.length === 0" :description="appStore.t('logs.empty')" />
       <div v-else class="logs-content">
         <div
           v-for="(log, index) in filteredLogs"
@@ -233,7 +226,7 @@ let refreshInterval: ReturnType<typeof setInterval> | null = null
 
 <style scoped>
 .logs-modal :deep(.ant-modal-content) {
-  @apply rounded-xl overflow-hidden;
+  @apply overflow-hidden rounded-xl;
 }
 
 .logs-modal :deep(.ant-modal-body) {
@@ -241,7 +234,7 @@ let refreshInterval: ReturnType<typeof setInterval> | null = null
 }
 
 .logs-header {
-  @apply flex items-center justify-between px-3 py-3 border-b border-slate-200 dark:border-slate-700;
+  @apply flex items-center justify-between border-b border-slate-200 px-6 py-3 dark:border-slate-700;
 }
 
 .header-title {
@@ -269,7 +262,7 @@ let refreshInterval: ReturnType<typeof setInterval> | null = null
 }
 
 .logs-toolbar {
-  @apply flex items-center justify-between gap-4 px-6 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50;
+  @apply flex items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/50 px-6 py-3 dark:border-slate-800 dark:bg-slate-900/50;
 }
 
 .toolbar-left {
@@ -280,16 +273,12 @@ let refreshInterval: ReturnType<typeof setInterval> | null = null
   @apply w-64;
 }
 
-.search-icon {
-  @apply text-slate-400;
-}
-
 .toolbar-right {
   @apply flex items-center gap-2;
 }
 
 .auto-scroll-toggle {
-  @apply flex items-center gap-2 mr-2;
+  @apply mr-2 flex items-center gap-2;
 }
 
 .toggle-label {
@@ -297,15 +286,7 @@ let refreshInterval: ReturnType<typeof setInterval> | null = null
 }
 
 .logs-container {
-  @apply h-96 overflow-y-auto bg-slate-900;
-}
-
-.logs-empty {
-  @apply py-16;
-}
-
-.logs-empty :deep(.ant-empty-description) {
-  @apply text-slate-400;
+  @apply h-96 overflow-y-auto bg-slate-900 py-4;
 }
 
 .logs-content {
@@ -313,15 +294,15 @@ let refreshInterval: ReturnType<typeof setInterval> | null = null
 }
 
 .log-line {
-  @apply flex px-3 py-0.5 hover:bg-slate-800/50 transition-colors;
+  @apply flex px-3 py-0.5 transition-colors hover:bg-slate-800/50;
 }
 
 .line-number {
-  @apply w-12 flex-shrink-0 text-slate-600 select-none text-right pr-4 border-r border-slate-700/50;
+  @apply w-12 flex-shrink-0 select-none border-r border-slate-700/50 pr-4 text-right text-slate-600;
 }
 
 .line-content {
-  @apply pl-4 text-slate-300 break-all;
+  @apply break-all pl-4 text-slate-300;
 }
 
 .log-error .line-content {

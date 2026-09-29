@@ -1,17 +1,18 @@
 <script lang="ts" setup>
-import { ConfigProvider, Modal, theme } from 'ant-design-vue'
+import { ConfigProvider, theme } from 'ant-design-vue'
 import enUS from 'ant-design-vue/es/locale/en_US'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
 import { Cpu, Settings } from 'lucide-vue-next'
 import { computed, getCurrentInstance, onMounted, onUnmounted, ref } from 'vue'
 import AppLogo from './components/AppLogo.vue'
-import ProcessDashboardSummary from './views/Process/ProcessDashboardSummary.vue'
+import AppQuitBlockedModal from './components/AppQuitBlockedModal.vue'
 import ProcessList from './views/Process.vue'
 import SettingsPage from './views/Setting.vue'
 import { trackVisit } from './services/analytics'
 import { autoCheckVersion, isAppStoreBuild } from './services/version'
 import { useAppStore } from './stores/app'
 import { initTestRegistry, registerNavigate, reportTestError, reportTestWarn, testActionSet, testActionUnset } from './utils/test'
+import * as AppAPI from '../wailsjs/go/main/App'
 import { EventsEmit, EventsOff, EventsOn } from '../wailsjs/runtime/runtime'
 
 const appStore = useAppStore()
@@ -66,13 +67,11 @@ onMounted(async () => {
       const _origMsgError = antMessage.error.bind(antMessage)
       const _origMsgWarning = antMessage.warning.bind(antMessage)
       ;(antMessage as unknown as Record<string, unknown>).error = (...args: unknown[]) => {
-        const content = typeof args[0] === 'string' ? args[0] : JSON.stringify(args[0])
-        reportTestError(`[message.error] ${content}`)
+        reportTestError(`[message.error] ${String(args[0])}`)
         return (_origMsgError as (...a: unknown[]) => unknown)(...args)
       }
       ;(antMessage as unknown as Record<string, unknown>).warning = (...args: unknown[]) => {
-        const content = typeof args[0] === 'string' ? args[0] : JSON.stringify(args[0])
-        reportTestWarn(`[message.warning] ${content}`)
+        reportTestWarn(`[message.warning] ${String(args[0])}`)
         return (_origMsgWarning as (...a: unknown[]) => unknown)(...args)
       }
     },
@@ -123,6 +122,10 @@ onMounted(async () => {
     quitBlockedVisible.value = false
     return true
   })
+  testActionSet('App.getConfig', () => AppAPI.GetConfig())
+
+  // ── 截图专用 action（prepare / cleanup）───────────────────────────────────
+  
 
   // 监听来自 Go 后端的调用请求（由 HTTP /auto ui-call 转发过来）
   EventsOn('autotest:call', async (data: { id: string; name: string; params: unknown }) => {
@@ -136,16 +139,28 @@ onMounted(async () => {
 
   // 托盘退出被阻止时（仍有进程在运行）弹出提示，且不退出应用
   EventsOn('app:quitBlocked', onQuitBlocked)
+
+  // 配置由 CLI 或托盘等外部来源改变时，整份配置回填 Store，界面各处自动同步
+  EventsOn('config:changed', (data: { config: Record<string, unknown>; origin: string }) => {
+    appStore.applyConfig(data.config)
+  })
+  // 进程列表或状态变化（含 CLI 启停、自动重启）时刷新列表
+  EventsOn('processes:changed', () => {
+    appStore.loadProcesses()
+  })
 })
 
 onUnmounted(() => {
   EventsOff('autotest:call')
   EventsOff('app:quitBlocked')
+  EventsOff('config:changed')
+  EventsOff('processes:changed')
   testActionUnset([
     'App.quitBlocked.isVisible',
     'App.quitBlocked.getMessage',
     'App.quitBlocked.simulate',
     'App.quitBlocked.hide',
+    'App.getConfig',
   ])
 })
 
@@ -156,9 +171,10 @@ const antLocale = computed(() => {
 const themeConfig = computed(() => ({
   algorithm: appStore.isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
   token: {
-    colorPrimary: '#10b981',
+    colorPrimary: appStore.isDark ? '#34d399' : '#10b981',
     borderRadius: 8,
-    fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+    fontFamily:
+      'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
   },
 }))
 </script>
@@ -174,22 +190,26 @@ const themeConfig = computed(() => ({
             <span class="logo-text">ProcHub</span>
           </div>
           <div class="sidebar-tabs">
-            <button
+            <a-button
               class="tab-button"
               :class="{ active: activeTab === 'processes' }"
+              type="text"
+              block
               @click="activeTab = 'processes'"
             >
-              <Cpu :size="20" />
+              <Cpu class="w-5 h-5" aria-hidden="true" />
               <span class="tab-label">{{ appStore.t('processes.title') }}</span>
-            </button>
-            <button
+            </a-button>
+            <a-button
               class="tab-button"
               :class="{ active: activeTab === 'settings' }"
+              type="text"
+              block
               @click="activeTab = 'settings'"
             >
-              <Settings :size="20" />
+              <Settings class="w-5 h-5" aria-hidden="true" />
               <span class="tab-label">{{ appStore.t('settings.title') }}</span>
-            </button>
+            </a-button>
           </div>
         </div>
 
@@ -197,7 +217,6 @@ const themeConfig = computed(() => ({
         <div class="main-content">
           <!-- Processes View -->
           <div v-show="activeTab === 'processes'" class="content-view">
-            <ProcessDashboardSummary />
             <ProcessList />
           </div>
 
@@ -210,14 +229,6 @@ const themeConfig = computed(() => ({
     </div>
 
     <!-- 托盘退出被阻止：仍有进程在运行 -->
-    <Modal
-      :open="quitBlockedVisible"
-      :title="appStore.t('messages.quitBlockedTitle')"
-      :footer="null"
-      :width="'min(420px, 90vw)'"
-      @cancel="quitBlockedVisible = false"
-    >
-      <p class="text-sm leading-relaxed">{{ quitBlockedMessage }}</p>
-    </Modal>
+    <AppQuitBlockedModal v-model:open="quitBlockedVisible" :message="quitBlockedMessage" />
   </ConfigProvider>
 </template>
