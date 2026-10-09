@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	goruntime "runtime"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -43,6 +44,7 @@ type App struct {
 	wslMgr        *service.WSLManager
 	controlServer *control.Server
 	systemLogger  *logging.RollingStore
+	wailsLogger   *logging.WailsLogger
 	dataDir       string
 	// configMu serializes configuration writes. Reads and writes can originate
 	// from the GUI, the CLI control server and the tray at the same time, so
@@ -71,16 +73,19 @@ func NewApp() *App {
 		loggers:      make(map[string]*ProcessLogger),
 		autoStartMgr: service.NewAutoStartManager(AppName, AppDisplayName),
 		wslMgr:       service.NewWSLManager(),
+		wailsLogger:  logging.NewWailsLogger(),
 	}
 }
 
 // GetLocale returns the current app locale, implementing platform.AppRef
 func (a *App) GetLocale() string {
+	defer a.recoverPanic("GetLocale")
 	return a.config.Locale
 }
 
 // GetCtx returns the Wails context, implementing platform.AppRef
 func (a *App) GetCtx() context.Context {
+	defer a.recoverPanic("GetCtx")
 	return a.ctx
 }
 
@@ -111,6 +116,12 @@ func (a *App) startup(ctx context.Context) {
 	systemLogDir := filepath.Join(a.dataDir, "system_logs")
 	os.MkdirAll(systemLogDir, 0755)
 	a.systemLogger = logging.NewRollingStore(systemLogDir, 1000, 10)
+	// Route the Wails framework logger into the same system log file.
+	if a.wailsLogger != nil {
+		a.wailsLogger.SetSink(func(level, message string) {
+			a.LogSystemError("wails."+level, message)
+		})
+	}
 	// Set up log callback for process manager
 	a.pm.SetLogCallback(func(processID, stream, line string) {
 		logger, ok := a.loggers[processID]
@@ -165,11 +176,13 @@ func (a *App) startup(ctx context.Context) {
 
 // Greet returns a greeting for the given name
 func (a *App) Greet(name string) string {
+	defer a.recoverPanic("Greet")
 	return fmt.Sprintf("Hello %s, It's show time!", name)
 }
 
 // AddProcess registers a new process
 func (a *App) AddProcess(def process.Definition) error {
+	defer a.recoverPanic("AddProcess")
 	a.processMu.Lock()
 	defer a.processMu.Unlock()
 
@@ -207,6 +220,7 @@ func (a *App) AddProcess(def process.Definition) error {
 
 // RemoveProcess removes a process by ID
 func (a *App) RemoveProcess(id string) error {
+	defer a.recoverPanic("RemoveProcess")
 	// Stop the process first
 	err := a.pm.Stop(id)
 	if err != nil {
@@ -241,6 +255,7 @@ func (a *App) RemoveProcess(id string) error {
 
 // UpdateProcess updates a process configuration
 func (a *App) UpdateProcess(id string, def process.Definition) error {
+	defer a.recoverPanic("UpdateProcess")
 	// Stop the process first (kept outside the lock: it can block for seconds)
 	err := a.pm.Stop(id)
 	if err != nil {
@@ -273,6 +288,7 @@ func (a *App) UpdateProcess(id string, def process.Definition) error {
 // SetProcessAutoStart toggles the auto-start flag of a process without
 // stopping or restarting the process if it is currently running.
 func (a *App) SetProcessAutoStart(id string, enabled bool) error {
+	defer a.recoverPanic("SetProcessAutoStart")
 	a.processMu.Lock()
 	cfg := a.config
 	found := false
@@ -304,6 +320,7 @@ func (a *App) SetProcessAutoStart(id string, enabled bool) error {
 
 // StartProcess starts a process by ID
 func (a *App) StartProcess(id string) error {
+	defer a.recoverPanic("StartProcess")
 	err := a.pm.Start(a.ctx, id)
 	if err != nil {
 		a.LogSystemError("StartProcess", fmt.Sprintf("Failed to start process %s: %v", id, err))
@@ -315,6 +332,7 @@ func (a *App) StartProcess(id string) error {
 
 // StopProcess stops a process by ID
 func (a *App) StopProcess(id string) error {
+	defer a.recoverPanic("StopProcess")
 	err := a.pm.Stop(id)
 	if err != nil {
 		a.LogSystemError("StopProcess", fmt.Sprintf("Failed to stop process %s: %v", id, err))
@@ -325,6 +343,7 @@ func (a *App) StopProcess(id string) error {
 
 // RestartProcess restarts a process by ID
 func (a *App) RestartProcess(id string) error {
+	defer a.recoverPanic("RestartProcess")
 	if err := a.pm.Stop(id); err != nil {
 		a.LogSystemError("RestartProcess", fmt.Sprintf("Failed to stop process %s during restart: %v", id, err))
 		return err
@@ -345,11 +364,13 @@ func (a *App) notifyProcessesChanged() {
 
 // ListProcesses returns all processes with their status
 func (a *App) ListProcesses() []process.Snapshot {
+	defer a.recoverPanic("ListProcesses")
 	return a.pm.List()
 }
 
 // GetProcessLogs returns logs for a specific process
 func (a *App) GetProcessLogs(id string) []logging.Entry {
+	defer a.recoverPanic("GetProcessLogs")
 	logger, ok := a.loggers[id]
 	if !ok {
 		return []logging.Entry{}
@@ -359,16 +380,19 @@ func (a *App) GetProcessLogs(id string) []logging.Entry {
 
 // GetConfig returns the current configuration
 func (a *App) GetConfig() config.AppConfig {
+	defer a.recoverPanic("GetConfig")
 	return a.config
 }
 
 // UpdateConfig updates the configuration
 func (a *App) UpdateConfig(cfg config.AppConfig) error {
+	defer a.recoverPanic("UpdateConfig")
 	return a.applyConfig(cfg, originGUI)
 }
 
 // SelectDirectory opens a directory selection dialog
 func (a *App) SelectDirectory() (string, error) {
+	defer a.recoverPanic("SelectDirectory")
 	dir, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
 		Title: "Select Working Directory",
 	})
@@ -389,6 +413,7 @@ type DataDirInfo struct {
 // GetDataDirInfo returns the effective data directory and whether it is the
 // built-in default, so the UI can warn about a custom location.
 func (a *App) GetDataDirInfo() DataDirInfo {
+	defer a.recoverPanic("GetDataDirInfo")
 	return DataDirInfo{
 		Path:      a.dataDir,
 		IsDefault: platform.IsDefaultDataDir(),
@@ -397,11 +422,13 @@ func (a *App) GetDataDirInfo() DataDirInfo {
 
 // OpenDataDir opens the effective data directory in the system file manager.
 func (a *App) OpenDataDir() error {
+	defer a.recoverPanic("OpenDataDir")
 	return platform.RevealPath(a.dataDir)
 }
 
 // SelectFile opens a file selection dialog for selecting executable/command
 func (a *App) SelectFile() (string, error) {
+	defer a.recoverPanic("SelectFile")
 	file, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
 		Title: "Select Command/Executable",
 	})
@@ -413,16 +440,19 @@ func (a *App) SelectFile() (string, error) {
 
 // GetAutoStartEnabled returns whether auto-start is enabled
 func (a *App) GetAutoStartEnabled() (bool, error) {
+	defer a.recoverPanic("GetAutoStartEnabled")
 	return a.autoStartMgr.IsEnabled()
 }
 
 // SetAutoStartEnabled enables or disables auto-start
 func (a *App) SetAutoStartEnabled(enabled bool) error {
+	defer a.recoverPanic("SetAutoStartEnabled")
 	return a.patchConfig(func(cfg *config.AppConfig) { cfg.AutoStart = enabled }, originGUI)
 }
 
 // GetAutoStartWSLEnabled returns whether WSL should start together with the app.
 func (a *App) GetAutoStartWSLEnabled() bool {
+	defer a.recoverPanic("GetAutoStartWSLEnabled")
 	return a.config.AutoStartWSL
 }
 
@@ -430,16 +460,19 @@ func (a *App) GetAutoStartWSLEnabled() bool {
 // It is an independent setting: it does not require the application auto-start
 // option to be enabled, and it does not block manual start/stop.
 func (a *App) SetAutoStartWSLEnabled(enabled bool) error {
+	defer a.recoverPanic("SetAutoStartWSLEnabled")
 	return a.patchConfig(func(cfg *config.AppConfig) { cfg.AutoStartWSL = enabled }, originGUI)
 }
 
 // GetWSLStatus returns the current WSL runtime status.
 func (a *App) GetWSLStatus() service.WSLStatus {
+	defer a.recoverPanic("GetWSLStatus")
 	return a.wslMgr.Status()
 }
 
 // StartWSL boots the default WSL distribution.
 func (a *App) StartWSL() error {
+	defer a.recoverPanic("StartWSL")
 	if err := a.wslMgr.Start(); err != nil {
 		a.LogSystemError("StartWSL", fmt.Sprintf("Failed to start WSL: %v", err))
 		return err
@@ -449,6 +482,7 @@ func (a *App) StartWSL() error {
 
 // StopWSL shuts down the whole WSL subsystem.
 func (a *App) StopWSL() error {
+	defer a.recoverPanic("StopWSL")
 	if err := a.wslMgr.Stop(); err != nil {
 		a.LogSystemError("StopWSL", fmt.Sprintf("Failed to stop WSL: %v", err))
 		return err
@@ -458,6 +492,7 @@ func (a *App) StopWSL() error {
 
 // RestartWSL shuts down and boots the WSL subsystem again.
 func (a *App) RestartWSL() error {
+	defer a.recoverPanic("RestartWSL")
 	if err := a.wslMgr.Restart(); err != nil {
 		a.LogSystemError("RestartWSL", fmt.Sprintf("Failed to restart WSL: %v", err))
 		return err
@@ -480,21 +515,25 @@ func (a *App) startWSLOnBoot() {
 
 // GetPlatform returns the current operating system
 func (a *App) GetPlatform() string {
+	defer a.recoverPanic("GetPlatform")
 	return a.autoStartMgr.GetPlatform()
 }
 
 // GetAppName returns the application display name
 func (a *App) GetAppName() string {
+	defer a.recoverPanic("GetAppName")
 	return AppDisplayName
 }
 
 // GetAppVersion returns the current app version
 func (a *App) GetAppVersion() string {
+	defer a.recoverPanic("GetAppVersion")
 	return appConfig.Version
 }
 
 // GetSystemVersion returns detailed system version information
 func (a *App) GetSystemVersion() map[string]string {
+	defer a.recoverPanic("GetSystemVersion")
 	info := make(map[string]string)
 	info["os"] = goruntime.GOOS
 	info["arch"] = goruntime.GOARCH
@@ -547,8 +586,44 @@ func (a *App) LogSystemError(component, message string) {
 	a.systemLogger.Append(entry)
 }
 
+// LogFrontendError writes a renderer-side event or error to the system log. It
+// is the local counterpart of the remote analytics report, so renderer errors
+// are still recorded when offline or when the analytics endpoint is down.
+func (a *App) LogFrontendError(level string, label string, data map[string]interface{}) {
+	defer a.recoverPanic("LogFrontendError")
+	if a.systemLogger == nil {
+		return
+	}
+	if level != "error" {
+		level = "info"
+	}
+	line := label
+	if len(data) > 0 {
+		if raw, err := json.Marshal(data); err == nil {
+			line = label + " " + string(raw)
+		}
+	}
+	a.systemLogger.Append(logging.Entry{
+		Timestamp: time.Now(),
+		Stream:    "renderer." + level,
+		Line:      line,
+	})
+}
+
+// recoverPanic logs the panic that aborted a bound method call (with its stack)
+// to the system log, then re-panics so the Wails dispatcher still turns the
+// call into a rejected promise for the frontend instead of a silent success.
+// It is meant to be used as `defer a.recoverPanic("MethodName")`.
+func (a *App) recoverPanic(name string) {
+	if r := recover(); r != nil {
+		a.LogSystemError("panic", fmt.Sprintf("%s panicked: %v\n%s", name, r, debug.Stack()))
+		panic(r)
+	}
+}
+
 // GetSystemLogs returns system logs from the last 24 hours
 func (a *App) GetSystemLogs() (string, error) {
+	defer a.recoverPanic("GetSystemLogs")
 	var logs strings.Builder
 
 	// Collect application system logs
@@ -605,6 +680,7 @@ func (a *App) GetSystemLogs() (string, error) {
 
 // GetAppConfig returns application configuration
 func (a *App) GetAppConfig() map[string]interface{} {
+	defer a.recoverPanic("GetAppConfig")
 	return map[string]interface{}{
 		"name":            appConfig.Name,
 		"title":           appConfig.Title,
@@ -624,6 +700,7 @@ func (a *App) GetAppConfig() map[string]interface{} {
 
 // GetProcess returns a single process by ID
 func (a *App) GetProcess(id string) (process.Snapshot, error) {
+	defer a.recoverPanic("GetProcess")
 	return a.pm.Get(id)
 }
 
@@ -755,6 +832,7 @@ func getPlatformVersion() string {
 
 // SendAnalytics sends analytics events to the collection endpoint
 func (a *App) SendAnalytics(events []AnalyticsEvent) {
+	defer a.recoverPanic("SendAnalytics")
 	go func() {
 		client := &http.Client{Timeout: 10 * time.Second}
 
@@ -807,6 +885,7 @@ func (a *App) SendAnalytics(events []AnalyticsEvent) {
 
 // SaveLogsToFile opens a save dialog and saves logs to the selected file
 func (a *App) SaveLogsToFile(processName string, content string) error {
+	defer a.recoverPanic("SaveLogsToFile")
 	filePath, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
 		Title:           "Save Logs",
 		DefaultFilename: fmt.Sprintf("%s-logs.txt", processName),
@@ -826,11 +905,13 @@ func (a *App) SaveLogsToFile(processName string, content string) error {
 
 // ShowWindow shows the main window (used by the frontend)
 func (a *App) ShowWindow() {
+	defer a.recoverPanic("ShowWindow")
 	platform.ShowMainWindow(a.ctx)
 }
 
 // HideWindow hides the main window and Dock icon
 func (a *App) HideWindow() {
+	defer a.recoverPanic("HideWindow")
 	runtime.WindowHide(a.ctx)
 	// Hide Dock icon on macOS
 	platform.HideDockIcon()
@@ -839,18 +920,21 @@ func (a *App) HideWindow() {
 // PrepareQuit marks the application as quitting so the window close handler
 // stops preventing the close. Implements platform.AppRef.
 func (a *App) PrepareQuit() {
+	defer a.recoverPanic("PrepareQuit")
 	SetQuitting(true)
 }
 
 // RunningProcessNames returns the names of processes that are still running or
 // starting. Implements platform.AppRef.
 func (a *App) RunningProcessNames() []string {
+	defer a.recoverPanic("RunningProcessNames")
 	return a.pm.RunningNames()
 }
 
 // NotifyQuitBlocked tells the frontend that quitting was blocked because some
 // processes are still running. Implements platform.AppRef.
 func (a *App) NotifyQuitBlocked(names []string) {
+	defer a.recoverPanic("NotifyQuitBlocked")
 	if a.ctx == nil {
 		return
 	}
@@ -863,6 +947,7 @@ func (a *App) NotifyQuitBlocked(names []string) {
 // QuitApp quits the application. Quitting is blocked while any process is still
 // running: the window is shown and the frontend displays a warning instead.
 func (a *App) QuitApp() {
+	defer a.recoverPanic("QuitApp")
 	if names := a.pm.RunningNames(); len(names) > 0 {
 		platform.ShowMainWindow(a.ctx)
 		a.NotifyQuitBlocked(names)
@@ -889,6 +974,7 @@ type versionCheckResponse struct {
 
 // CheckVersion checks for new version from the server
 func (a *App) CheckVersion() (VersionInfo, error) {
+	defer a.recoverPanic("CheckVersion")
 	client := &http.Client{Timeout: 10 * time.Second}
 
 	// Build User-Agent: AppOpen/{AppName}/{Version} Platform/{PlatformName}/{PlatformArch}/{PlatformVersion}/{UUID}

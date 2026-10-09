@@ -153,11 +153,13 @@ func (a *App) patchConfig(mutate func(cfg *config.AppConfig), origin string) err
 
 // SetTheme persists the UI theme (light/dark) and broadcasts the change.
 func (a *App) SetTheme(theme string) error {
+	defer a.recoverPanic("SetTheme")
 	return a.patchConfig(func(cfg *config.AppConfig) { cfg.Theme = theme }, originGUI)
 }
 
 // SetLocale persists the UI locale (zh/en), refreshing the tray language.
 func (a *App) SetLocale(locale string) error {
+	defer a.recoverPanic("SetLocale")
 	return a.patchConfig(func(cfg *config.AppConfig) { cfg.Locale = locale }, originGUI)
 }
 

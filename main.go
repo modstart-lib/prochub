@@ -147,6 +147,10 @@ func main() {
 		CSSDragValue:             "drag",
 		CSSDragProperty:          "--wails-draggable",
 
+		// Route Wails framework logs (binding dispatch errors, recovered panics)
+		// into the application's system log file.
+		Logger: app.wailsLogger,
+
 		// Custom close behavior: hide window and Dock icon instead of quitting.
 		// When the user really quits (tray menu / QuitApp), the quitting flag
 		// is set first so the close is allowed to proceed and the app exits.
