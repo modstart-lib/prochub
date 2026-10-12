@@ -2,6 +2,8 @@
 
 ## [unreleased]
 
+- 修复：Windows 下守护启动的控制台子进程日志中文乱码——子进程输出被重定向到管道时按系统 ANSI 代码页（简体中文为 CP936/GBK）而非 UTF-8 编码，现统一解码为 UTF-8 后再落盘与推送（`internal/platform` 新增 `DecodeOutput`，按代码页转码 UTF-8 直通）；同时修复系统信息中 `osVersion` 同类乱码（如「版本」显示为「�汾」）
+
 - 新增：运行时诊断——渲染进程错误（未捕获异常、Promise 拒绝、Vue 错误、脚本/资源加载失败）先写入本地系统日志再上报远端，并在启动与挂载阶段写入 `renderer.boot` / `renderer.mounted` 标记，便于区分「未加载」与「挂载崩溃」导致的白屏
 - 新增：Go 暴露方法统一 panic 兜底（`recoverPanic`），panic 时把方法名与堆栈写入系统日志并继续向上抛出错误，避免崩溃被静默吞掉
 - 优化：Wails 框架内部日志（绑定调用错误、恢复的 panic、启动阶段日志）通过 `WailsLogger` 接入系统日志文件，与业务日志统一落盘

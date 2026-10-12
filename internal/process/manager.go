@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"sync"
 	"time"
+
+	"prochub/internal/platform"
 )
 
 const (
@@ -307,7 +309,9 @@ func (m *Manager) run(ctx context.Context, id string) {
 func (m *Manager) streamOutput(id, stream string, reader io.Reader, callback LogCallback) {
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
-		line := scanner.Text()
+		// Console programs on Windows emit legacy-encoded bytes when their
+		// output is piped, so decode to UTF-8 before the line is stored.
+		line := platform.DecodeOutput(scanner.Bytes())
 		if callback != nil {
 			callback(id, stream, line)
 		}

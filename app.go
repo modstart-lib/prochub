@@ -556,7 +556,7 @@ func (a *App) GetSystemVersion() map[string]string {
 
 	if cmd != nil {
 		if output, err := cmd.Output(); err == nil {
-			info["osVersion"] = strings.TrimSpace(string(output))
+			info["osVersion"] = strings.TrimSpace(platform.DecodeOutput(output))
 		} else {
 			info["osVersion"] = "unknown"
 		}
@@ -807,7 +807,7 @@ func getPlatformVersion() string {
 		out, err := exec.Command("cmd", "/c", "ver").Output()
 		if err == nil {
 			// Parse "Microsoft Windows [Version 10.0.19041.1234]"
-			s := string(out)
+			s := platform.DecodeOutput(out)
 			if start := strings.Index(s, "[Version "); start != -1 {
 				s = s[start+9:]
 				if end := strings.Index(s, "]"); end != -1 {
