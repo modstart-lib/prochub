@@ -31,6 +31,7 @@ const form = reactive<ProcessForm>({
 })
 
 const activeTab = ref('basic')
+const formTabsRef = ref<InstanceType<typeof ProcessFormTabs> | null>(null)
 
 const resetForm = () => {
   form.name = ''
@@ -170,6 +171,17 @@ testActionSet('ProcessEdit.addEnv', (params: unknown) => {
   for (let i = 0; i < n; i++) form.env.push({ key: '', value: '' })
 })
 testActionSet('ProcessEdit.getEnvCount', () => form.env.length)
+testActionSet('ProcessEdit.openEnvImport', () => {
+  formTabsRef.value?.openImport()
+})
+testActionSet('ProcessEdit.closeEnvImport', () => {
+  formTabsRef.value?.closeImport()
+})
+testActionSet('ProcessEdit.getEnvImportVisible', () => formTabsRef.value?.getImportVisible() ?? false)
+testActionSet('ProcessEdit.importEnv', (params: unknown) => {
+  const { text } = (params ?? {}) as { text?: string }
+  return formTabsRef.value?.importEnvText(text ?? '') ?? 0
+})
 testActionSet('ProcessEdit.submit', async () => {
   await handleOk()
   return { visible: props.visible }
@@ -215,7 +227,7 @@ testActionSet('ProcessEdit.cancel', () => {
       </div>
     </template>
 
-    <ProcessFormTabs :form="form" :active-tab="activeTab" @update:active-tab="activeTab = $event" />
+    <ProcessFormTabs ref="formTabsRef" :form="form" :active-tab="activeTab" @update:active-tab="activeTab = $event" />
   </Modal>
 </template>
 

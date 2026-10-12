@@ -89,6 +89,11 @@ export default {
     env: {
       key: 'Key',
       value: 'Value',
+      import: 'Import',
+      importTitle: 'Import from Text',
+      importPlaceholder: 'One KEY=VALUE per line\n# comments, blank lines and quoted values supported',
+      importHint: 'One KEY=VALUE per line; supports # comments, blank lines and quoted values. Duplicate keys overwrite existing values.',
+      importEmpty: 'No valid environment variables parsed',
     },
     pickCommand: 'Select command file',
     pickWorkingDir: 'Select working directory',

@@ -1,9 +1,11 @@
 <script lang="ts" setup>
 import { Button, Divider, Form, FormItem, Input, InputNumber, Select, Switch, TabPane, Tabs } from 'ant-design-vue'
-import { FileSearch, Folder, FolderOpen, Minus, Plus, Settings2, Terminal, Variable } from 'lucide-vue-next'
-import { computed } from 'vue'
+import { ClipboardPaste, FileSearch, Folder, FolderOpen, Minus, Plus, Settings2, Terminal, Variable } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
 import * as AppAPI from '../../../wailsjs/go/main/App'
 import { useAppStore } from '../../stores/app'
+import { mergeEnvEntries, parseEnvText, type EnvEntry } from '../../utils/env'
+import ProcessEnvImportModal from './ProcessEnvImportModal.vue'
 
 export interface ProcessForm {
   name: string
@@ -61,6 +63,28 @@ const removeEnv = (index: number) => {
     props.form.env.push({ key: '', value: '' })
   }
 }
+
+const importVisible = ref(false)
+
+const openImport = () => {
+  importVisible.value = true
+}
+
+const closeImport = () => {
+  importVisible.value = false
+}
+
+const applyImport = (entries: EnvEntry[]) => {
+  props.form.env = mergeEnvEntries(props.form.env, entries)
+}
+
+const importEnvText = (text: string): number => {
+  const entries = parseEnvText(text)
+  if (entries.length) applyImport(entries)
+  return entries.length
+}
+
+defineExpose({ openImport, closeImport, getImportVisible: () => importVisible.value, importEnvText })
 </script>
 
 <template>
@@ -146,10 +170,16 @@ const removeEnv = (index: number) => {
       <div class="env-section">
         <div class="env-header">
           <span class="env-title">{{ appStore.t('processes.fields.env') }}</span>
-          <Button type="dashed" @click="addEnv">
-            <template #icon><Plus class="w-4 h-4" aria-hidden="true" /></template>
-            {{ appStore.t('actions.addEnv') }}
-          </Button>
+          <div class="env-actions">
+            <Button @click="openImport">
+              <template #icon><ClipboardPaste class="w-4 h-4" aria-hidden="true" /></template>
+              {{ appStore.t('processes.env.import') }}
+            </Button>
+            <Button type="dashed" @click="addEnv">
+              <template #icon><Plus class="w-4 h-4" aria-hidden="true" /></template>
+              {{ appStore.t('actions.addEnv') }}
+            </Button>
+          </div>
         </div>
         <Divider class="my-3" />
         <div class="env-list">
@@ -174,6 +204,8 @@ const removeEnv = (index: number) => {
       </div>
     </TabPane>
   </Tabs>
+
+  <ProcessEnvImportModal v-model:visible="importVisible" @import="applyImport" />
 </template>
 
 <style scoped>
@@ -207,6 +239,10 @@ const removeEnv = (index: number) => {
 
 .env-header {
   @apply flex items-center justify-between;
+}
+
+.env-actions {
+  @apply flex items-center gap-2;
 }
 
 .env-title {

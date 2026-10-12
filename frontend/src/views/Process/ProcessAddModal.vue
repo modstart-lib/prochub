@@ -30,6 +30,7 @@ const form = reactive<ProcessForm>({
 })
 
 const activeTab = ref('basic')
+const formTabsRef = ref<InstanceType<typeof ProcessFormTabs> | null>(null)
 
 const resetForm = () => {
   form.name = ''
@@ -152,6 +153,17 @@ testActionSet('ProcessAdd.removeEnv', (params: unknown) => {
   if (form.env.length === 0) form.env.push({ key: '', value: '' })
 })
 testActionSet('ProcessAdd.getEnvCount', () => form.env.length)
+testActionSet('ProcessAdd.openEnvImport', () => {
+  formTabsRef.value?.openImport()
+})
+testActionSet('ProcessAdd.closeEnvImport', () => {
+  formTabsRef.value?.closeImport()
+})
+testActionSet('ProcessAdd.getEnvImportVisible', () => formTabsRef.value?.getImportVisible() ?? false)
+testActionSet('ProcessAdd.importEnv', (params: unknown) => {
+  const { text } = (params ?? {}) as { text?: string }
+  return formTabsRef.value?.importEnvText(text ?? '') ?? 0
+})
 testActionSet('ProcessAdd.submit', async () => {
   await handleOk()
   return { visible: props.visible }
@@ -174,6 +186,6 @@ testActionSet('ProcessAdd.cancel', () => {
     @ok="handleOk"
     @cancel="emit('update:visible', false)"
   >
-    <ProcessFormTabs :form="form" :active-tab="activeTab" @update:active-tab="activeTab = $event" />
+    <ProcessFormTabs ref="formTabsRef" :form="form" :active-tab="activeTab" @update:active-tab="activeTab = $event" />
   </Modal>
 </template>

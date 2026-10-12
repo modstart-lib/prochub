@@ -89,6 +89,11 @@ export default {
     env: {
       key: '键',
       value: '值',
+      import: '文本导入',
+      importTitle: '文本导入',
+      importPlaceholder: '每行一条，格式 KEY=VALUE\n支持 # 注释、空行与引号包裹的值',
+      importHint: '每行一条 KEY=VALUE，支持 # 注释、空行与引号包裹的值；同名变量将覆盖已有值。',
+      importEmpty: '未解析到有效的环境变量',
     },
     pickCommand: '选择命令文件',
     pickWorkingDir: '选择工作目录',
