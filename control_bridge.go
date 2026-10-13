@@ -113,6 +113,16 @@ func (b *controlBridge) RestartWSL() error {
 	return b.app.RestartWSL()
 }
 
+// ShowWindow restores and focuses the main window. A second launch of the
+// executable calls this so the already running instance takes over instead of a
+// duplicate process being started. Logging it here records the handover in the
+// running instance's system log.
+func (b *controlBridge) ShowWindow() error {
+	b.app.LogSystemError("single-instance", "show requested by another launch")
+	b.app.ShowWindow()
+	return nil
+}
+
 // startControlServer starts the local control server and publishes its port and
 // token to the data directory so the CLI can reach the running app.
 func (a *App) startControlServer() {

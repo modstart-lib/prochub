@@ -16,12 +16,13 @@ import (
 // fakeBackend is an in-memory Backend used to exercise the control server and
 // client without a real application.
 type fakeBackend struct {
-	items    []process.Snapshot
-	logs     []string
-	cfg      ConfigSummary
-	started  []string
-	running  bool
-	wslCalls []string
+	items     []process.Snapshot
+	logs      []string
+	cfg       ConfigSummary
+	started   []string
+	running   bool
+	wslCalls  []string
+	showCalls int
 }
 
 func (f *fakeBackend) Status() StatusInfo {
@@ -73,6 +74,11 @@ func (f *fakeBackend) RestartWSL() error {
 }
 
 func (f *fakeBackend) Config() ConfigSummary { return f.cfg }
+
+func (f *fakeBackend) ShowWindow() error {
+	f.showCalls++
+	return nil
+}
 
 func (f *fakeBackend) UpdateConfig(patch ConfigPatch) error {
 	if patch.Theme != nil {
@@ -224,6 +230,17 @@ func TestClientConfigPatch(t *testing.T) {
 	bad := "rainbow"
 	if err := client.UpdateConfig(ConfigPatch{Theme: &bad}); err == nil {
 		t.Fatal("expected an error for an invalid theme")
+	}
+}
+
+func TestClientShow(t *testing.T) {
+	client, backend := newTestClient(t)
+
+	if err := client.Show(); err != nil {
+		t.Fatalf("Show failed: %v", err)
+	}
+	if backend.showCalls != 1 {
+		t.Fatalf("expected 1 show call, got %d", backend.showCalls)
 	}
 }
 

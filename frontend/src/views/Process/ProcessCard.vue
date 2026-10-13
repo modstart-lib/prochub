@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { Button, Spin, Switch, Tag, Tooltip } from 'ant-design-vue'
-import { FileText, Hash, Pencil, Play, RefreshCw, RotateCw, Square } from 'lucide-vue-next'
+import { Eye, FileText, Hash, Pencil, Play, RefreshCw, RotateCw, Square } from 'lucide-vue-next'
 import type { ProcessItem } from '@/stores/app'
 import { useAppStore } from '@/stores/app'
 
@@ -9,6 +9,7 @@ const emit = defineEmits<{
   start: [process: ProcessItem]
   restart: [process: ProcessItem]
   logs: [process: ProcessItem]
+  detail: [process: ProcessItem]
   edit: [process: ProcessItem]
   autoStartChange: [process: ProcessItem, enabled: boolean]
 }>()
@@ -80,6 +81,11 @@ const onAutoStartChange = (checked: boolean | string | number) => {
           <div class="meta-item meta-id" :title="process.id">#{{ process.id }}</div>
         </div>
         <div class="card-actions">
+          <Tooltip :title="appStore.t('actions.detail')">
+            <Button :aria-label="appStore.t('actions.detail')" @click="emit('detail', process)">
+              <Eye class="w-4 h-4" aria-hidden="true" />
+            </Button>
+          </Tooltip>
           <Tooltip :title="appStore.t('actions.restart')">
             <Button :disabled="process.status === 'stopped'" :aria-label="appStore.t('actions.restart')" @click="emit('restart', process)">
               <RotateCw class="w-4 h-4" aria-hidden="true" />
@@ -114,7 +120,7 @@ const onAutoStartChange = (checked: boolean | string | number) => {
 
 <style scoped>
 .process-card {
-  @apply rounded-xl border border-slate-200/80 bg-gradient-to-br from-white to-slate-50/50 p-4 transition-shadow duration-200 hover:shadow-md dark:border-slate-700/80 dark:from-slate-800 dark:to-slate-900/50;
+  @apply h-full rounded-xl border border-slate-200/80 bg-gradient-to-br from-white to-slate-50/50 p-4 transition-shadow duration-200 hover:shadow-md dark:border-slate-700/80 dark:from-slate-800 dark:to-slate-900/50;
 }
 
 .process-card-running {

@@ -21,9 +21,20 @@ type Client struct {
 	http    *http.Client
 }
 
+// defaultClientTimeout bounds a control request when the caller does not pick an
+// explicit timeout.
+const defaultClientTimeout = 30 * time.Second
+
 // NewClient reads auth.json from dataDir and returns a client for the running
 // application. A missing auth file means the application is not running.
 func NewClient(dataDir string) (*Client, error) {
+	return NewClientWithTimeout(dataDir, defaultClientTimeout)
+}
+
+// NewClientWithTimeout is NewClient with an explicit HTTP timeout. The startup
+// single-instance probe uses a short timeout so a wedged instance cannot delay a
+// new launch.
+func NewClientWithTimeout(dataDir string, timeout time.Duration) (*Client, error) {
 	info, err := ReadAuth(dataDir)
 	if err != nil {
 		return nil, err
@@ -31,10 +42,13 @@ func NewClient(dataDir string) (*Client, error) {
 	if info.Port <= 0 || info.Token == "" {
 		return nil, errors.New("auth.json 内容无效，请重启 ProcHub")
 	}
+	if timeout <= 0 {
+		timeout = defaultClientTimeout
+	}
 	return &Client{
 		baseURL: fmt.Sprintf("http://127.0.0.1:%d", info.Port),
 		token:   info.Token,
-		http:    &http.Client{Timeout: 30 * time.Second},
+		http:    &http.Client{Timeout: timeout},
 	}, nil
 }
 
@@ -106,6 +120,12 @@ func (c *Client) StopWSL() error {
 // RestartWSL shuts down and boots the WSL subsystem again.
 func (c *Client) RestartWSL() error {
 	return c.do(http.MethodPost, "/control/wsl/restart", nil, nil)
+}
+
+// Show asks the running application to restore and focus its main window. A
+// second launch calls it before exiting so the existing instance takes over.
+func (c *Client) Show() error {
+	return c.do(http.MethodPost, "/control/show", nil, nil)
 }
 
 func (c *Client) do(method, path string, body interface{}, out interface{}) error {

@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 
 	"prochub/internal/cli"
+	"prochub/internal/logging"
 	"prochub/internal/platform"
 
 	"github.com/wailsapp/wails/v2"
@@ -125,6 +126,17 @@ func main() {
 		}))
 	}
 
+	dataDir := platform.MustDataDir()
+
+	// Process-level single-instance guard. Wails' own lock can let a second
+	// instance through (for example when the first runs elevated, or while the
+	// hidden window is not created yet) and such an instance then wedges in
+	// WebView2 because both share the same user data folder. Detect the running
+	// instance ourselves first; Wails' SingleInstanceLock stays as a backstop.
+	if handleExistingInstance(dataDir, logging.NewSystemLogger(dataDir)) {
+		os.Exit(0)
+	}
+
 	// Create an instance of the app structure
 	app := NewApp()
 	globalApp = app
@@ -206,6 +218,7 @@ func main() {
 		SingleInstanceLock: &options.SingleInstanceLock{
 			UniqueId: "prochub-app-unique-id",
 			OnSecondInstanceLaunch: func(secondInstanceData options.SecondInstanceData) {
+				logSecondInstanceLaunch(secondInstanceData)
 				if globalApp != nil && globalApp.ctx != nil {
 					// Restore and show the window (also restores the macOS Dock icon)
 					platform.ShowMainWindow(globalApp.ctx)

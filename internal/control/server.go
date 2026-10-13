@@ -75,6 +75,9 @@ type Backend interface {
 	StartWSL() error
 	StopWSL() error
 	RestartWSL() error
+	// ShowWindow restores and focuses the application main window. A second
+	// launch calls it so the running instance takes over.
+	ShowWindow() error
 }
 
 // Server is the local HTTP control server embedded in the running application.
@@ -117,6 +120,7 @@ func (s *Server) Start() (int, error) {
 	mux.HandleFunc("POST /control/wsl/start", s.handleWSLStart)
 	mux.HandleFunc("POST /control/wsl/stop", s.handleWSLStop)
 	mux.HandleFunc("POST /control/wsl/restart", s.handleWSLRestart)
+	mux.HandleFunc("POST /control/show", s.handleShow)
 
 	s.httpSrv = &http.Server{
 		Handler:           s.withAuth(mux),
@@ -261,6 +265,14 @@ func (s *Server) handleWSLRestart(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	writeData(w, s.backend.WSLStatus())
+}
+
+func (s *Server) handleShow(w http.ResponseWriter, _ *http.Request) {
+	if err := s.backend.ShowWindow(); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeData(w, map[string]string{"status": "shown"})
 }
 
 func describeProcessError(id string, err error) string {

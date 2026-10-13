@@ -1,29 +1,54 @@
 <script lang="ts" setup>
-import { Button, InputSearch, message } from 'ant-design-vue'
+import { Button, InputSearch, Segmented, message } from 'ant-design-vue'
 import { Cpu, Plus } from 'lucide-vue-next'
-import { computed, onMounted, ref } from 'vue'
-import type { ProcessItem } from '../stores/app'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import type { ProcessItem, ProcessStatus } from '../stores/app'
 import { useAppStore } from '../stores/app'
 import ProcessAddModal from '@/views/Process/ProcessAddModal.vue'
 import ProcessEditModal from '@/views/Process/ProcessEditModal.vue'
 import ProcessLogsModal from '@/views/Process/ProcessLogsModal.vue'
+import ProcessDetailModal from '@/views/Process/ProcessDetailModal.vue'
 import ProcessCard from '@/views/Process/ProcessCard.vue'
 import ProcessDashboardSummary from '@/views/Process/ProcessDashboardSummary.vue'
 import AppEmptyState from '@/components/AppEmptyState.vue'
-import { testActionSet } from '@/utils/test'
+import { testActionSet, testActionUnset } from '@/utils/test'
+
+type StatusFilter = 'all' | 'running' | 'stopped' | 'errored'
 
 const appStore = useAppStore()
 const showModal = ref(false)
 const showEditModal = ref(false)
 const showLogsModal = ref(false)
+const showDetailModal = ref(false)
 const editingProcess = ref<ProcessItem | null>(null)
 const logsProcess = ref<ProcessItem | null>(null)
+const detailProcessId = ref('')
 const searchQuery = ref('')
+const statusFilter = ref<StatusFilter>('all')
 const loadingProcessId = ref<string | null>(null)
+
+// Active processes cover both running and the transient starting state.
+const isActiveStatus = (status: ProcessStatus) => status === 'running' || status === 'starting'
+
+// Filter tabs shown in the toolbar, each with its own live count.
+const statusFilterDefs: Array<{ value: StatusFilter; match: (status: ProcessStatus) => boolean }> = [
+  { value: 'all', match: () => true },
+  { value: 'running', match: isActiveStatus },
+  { value: 'stopped', match: (status) => status === 'stopped' },
+  { value: 'errored', match: (status) => status === 'errored' },
+]
+
+// Group order keeps healthy processes first and failures easy to spot.
+const statusGroupDefs: Array<{ key: string; labelKey: string; match: (status: ProcessStatus) => boolean }> = [
+  { key: 'running', labelKey: 'processes.status.running', match: isActiveStatus },
+  { key: 'errored', labelKey: 'processes.status.errored', match: (status) => status === 'errored' },
+  { key: 'stopped', labelKey: 'processes.status.stopped', match: (status) => status === 'stopped' },
+]
 
 // Filter and sort process list by ID (ensure fixed order)
 const filteredProcesses = computed(() => {
-  let list = [...appStore.processes]
+  const matcher = statusFilterDefs.find((f) => f.value === statusFilter.value)!.match
+  const list = appStore.processes.filter((p) => matcher(p.status))
   // Sort by ID to ensure list order is fixed
   list.sort((a, b) => a.id.localeCompare(b.id))
   if (!searchQuery.value.trim()) {
@@ -34,6 +59,36 @@ const filteredProcesses = computed(() => {
     (p) => p.name.toLowerCase().includes(query) || p.command.toLowerCase().includes(query)
   )
 })
+
+// Filter options carry counts so the tab bar doubles as a status overview.
+const filterOptions = computed(() =>
+  statusFilterDefs.map((f) => {
+    const count = appStore.processes.filter((p) => f.match(p.status)).length
+    const label = f.value === 'all' ? appStore.t('processes.filter.all') : appStore.t(`processes.status.${f.value}`)
+    return { value: f.value, label: `${label} ${count}` }
+  })
+)
+
+// Grouped view for the "all" filter; a single status filter renders one grid.
+const groupedProcesses = computed(() =>
+  statusGroupDefs
+    .map((g) => ({
+      key: g.key,
+      label: appStore.t(g.labelKey),
+      items: filteredProcesses.value.filter((p) => g.match(p.status)),
+    }))
+    .filter((g) => g.items.length > 0)
+)
+
+const showGroupHeaders = computed(() => statusFilter.value === 'all')
+
+const emptyDescription = computed(() =>
+  appStore.processes.length === 0 ? appStore.t('processes.empty') : appStore.t('processes.noMatch')
+)
+
+const onStatusFilterChange = (value: string | number) => {
+  statusFilter.value = value as StatusFilter
+}
 
 // Load processes on mount
 onMounted(() => {
@@ -51,6 +106,13 @@ onMounted(() => {
   testActionSet('Process.setSearch', (params: unknown) => {
     searchQuery.value = (params as { query: string }).query
   })
+  testActionSet('Process.getStatusFilter', () => statusFilter.value)
+  testActionSet('Process.setStatusFilter', (params: unknown) => {
+    statusFilter.value = (params as { filter: StatusFilter }).filter
+  })
+  testActionSet('Process.getGroups', () =>
+    groupedProcesses.value.map((g) => ({ key: g.key, count: g.items.length }))
+  )
   testActionSet('Process.addModal.show', () => { showModal.value = true })
   testActionSet('Process.addModal.hide', () => { showModal.value = false })
   testActionSet('Process.addModal.isVisible', () => showModal.value)
@@ -72,6 +134,15 @@ onMounted(() => {
     showLogsModal.value = true
   })
   testActionSet('Process.logsModal.hide', () => { showLogsModal.value = false })
+  testActionSet('Process.detailModal.isVisible', () => showDetailModal.value)
+  testActionSet('Process.detailModal.show', (params: unknown) => {
+    const { id } = params as { id: string }
+    const found = appStore.processes.find((p) => p.id === id)
+    if (!found) throw new Error(`进程不存在: ${id}`)
+    detailProcessId.value = found.id
+    showDetailModal.value = true
+  })
+  testActionSet('Process.detailModal.hide', () => { showDetailModal.value = false })
   testActionSet('Process.start', async (params: unknown) => {
     const { id } = params as { id: string }
     await appStore.startProcess(id)
@@ -95,6 +166,10 @@ onMounted(() => {
 
   // ── 截图专用 action（prepare / cleanup）───────────────────────────────────
   
+})
+
+onUnmounted(() => {
+  testActionUnset(['Process.getStatusFilter', 'Process.setStatusFilter', 'Process.getGroups', 'Process.detailModal.isVisible', 'Process.detailModal.show', 'Process.detailModal.hide'])
 })
 
 const openEditModal = (process: ProcessItem) => {
@@ -147,6 +222,11 @@ const handleLogs = async (process: ProcessItem) => {
   logsProcess.value = process
   showLogsModal.value = true
 }
+
+const handleDetail = (process: ProcessItem) => {
+  detailProcessId.value = process.id
+  showDetailModal.value = true
+}
 </script>
 
 <template>
@@ -177,21 +257,36 @@ const handleLogs = async (process: ProcessItem) => {
     <!-- Dashboard summary -->
     <ProcessDashboardSummary />
 
-    <!-- Process List -->
-    <div class="process-grid">
-      <AppEmptyState v-if="filteredProcesses.length === 0" :description="appStore.t('processes.empty')" />
+    <!-- Status filter -->
+    <div class="process-toolbar">
+      <Segmented :value="statusFilter" :options="filterOptions" @change="onStatusFilterChange" />
+    </div>
 
-      <ProcessCard
-        v-for="process in filteredProcesses"
-        :key="process.id"
-        :process="process"
-        :loading="loadingProcessId === process.id"
-        @start="handleStart"
-        @restart="handleRestart"
-        @logs="handleLogs"
-        @edit="openEditModal"
-        @auto-start-change="handleAutoStartToggle"
-      />
+    <!-- Process List -->
+    <AppEmptyState v-if="filteredProcesses.length === 0" :description="emptyDescription" />
+
+    <div v-else class="process-groups">
+      <section v-for="group in groupedProcesses" :key="group.key" class="process-group">
+        <div v-if="showGroupHeaders" class="group-header">
+          <span class="group-dot" :class="`group-dot-${group.key}`" aria-hidden="true"></span>
+          <span class="group-title">{{ group.label }}</span>
+          <span class="group-count">{{ group.items.length }}</span>
+        </div>
+        <div class="process-grid">
+          <ProcessCard
+            v-for="process in group.items"
+            :key="process.id"
+            :process="process"
+            :loading="loadingProcessId === process.id"
+            @start="handleStart"
+            @restart="handleRestart"
+            @logs="handleLogs"
+            @detail="handleDetail"
+            @edit="openEditModal"
+            @auto-start-change="handleAutoStartToggle"
+          />
+        </div>
+      </section>
     </div>
 
     <!-- 模态框 -->
@@ -202,6 +297,7 @@ const handleLogs = async (process: ProcessItem) => {
       :process-id="logsProcess?.id || ''"
       :process-name="logsProcess?.name || ''"
     />
+    <ProcessDetailModal v-model:visible="showDetailModal" :process-id="detailProcessId" />
   </section>
 </template>
 
@@ -238,7 +334,54 @@ const handleLogs = async (process: ProcessItem) => {
   @apply w-48;
 }
 
-.process-grid {
+.process-toolbar {
+  @apply flex items-center;
+}
+
+.process-groups {
+  @apply flex flex-col gap-4;
+}
+
+.process-group {
   @apply flex flex-col gap-3;
+}
+
+.group-header {
+  @apply flex items-center gap-2;
+}
+
+.group-dot {
+  @apply h-2 w-2 rounded-full;
+}
+
+.group-dot-running {
+  @apply bg-emerald-500;
+}
+
+.group-dot-errored {
+  @apply bg-red-500;
+}
+
+.group-dot-stopped {
+  @apply bg-slate-400;
+}
+
+.group-title {
+  @apply text-sm font-semibold text-slate-700 dark:text-slate-300;
+}
+
+.group-count {
+  @apply rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-slate-700 dark:text-slate-400;
+}
+
+/* Responsive multi-column grid so many processes stay visible without a long scroll. */
+.process-grid {
+  @apply grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3;
+}
+
+/* Stretch cards to the row height so grid siblings line up. */
+.process-grid :deep(.ant-spin-nested-loading),
+.process-grid :deep(.ant-spin-container) {
+  height: 100%;
 }
 </style>

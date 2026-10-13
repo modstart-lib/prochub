@@ -75,6 +75,8 @@ func (s *stubBackend) RestartWSL() error {
 
 func (s *stubBackend) Config() control.ConfigSummary { return s.cfg }
 
+func (s *stubBackend) ShowWindow() error { return nil }
+
 func (s *stubBackend) UpdateConfig(patch control.ConfigPatch) error {
 	if patch.Theme != nil {
 		if *patch.Theme != "light" && *patch.Theme != "dark" {

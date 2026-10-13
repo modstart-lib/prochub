@@ -42,6 +42,8 @@ install: check-deps
 dev: check-deps
 	wails dev
 
+# 
+
 # Build the application
 build: check-deps
 	wails build

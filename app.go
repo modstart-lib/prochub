@@ -99,9 +99,7 @@ func (a *App) startup(ctx context.Context) {
 	if err != nil {
 		cfg = config.DefaultConfig()
 		// Initialize system logger first before logging errors
-		systemLogDir := filepath.Join(a.dataDir, "system_logs")
-		os.MkdirAll(systemLogDir, 0755)
-		a.systemLogger = logging.NewRollingStore(systemLogDir, 1000, 10)
+		a.systemLogger = logging.NewSystemLogger(a.dataDir)
 		a.LogSystemError("startup", fmt.Sprintf("Failed to load config, using default: %v", err))
 	}
 	a.config = cfg
@@ -113,9 +111,7 @@ func (a *App) startup(ctx context.Context) {
 	logDir := filepath.Join(a.dataDir, a.config.LogDir)
 	os.MkdirAll(logDir, 0755)
 	// Initialize system logger
-	systemLogDir := filepath.Join(a.dataDir, "system_logs")
-	os.MkdirAll(systemLogDir, 0755)
-	a.systemLogger = logging.NewRollingStore(systemLogDir, 1000, 10)
+	a.systemLogger = logging.NewSystemLogger(a.dataDir)
 	// Route the Wails framework logger into the same system log file.
 	if a.wailsLogger != nil {
 		a.wailsLogger.SetSink(func(level, message string) {
@@ -141,6 +137,8 @@ func (a *App) startup(ctx context.Context) {
 		// Store in rolling file
 		logger.store.Append(entry)
 	})
+
+	
 
 	// Register saved processes
 	for _, def := range a.config.Processes {
@@ -631,7 +629,7 @@ func (a *App) GetSystemLogs() (string, error) {
 	if dataDir == "" {
 		dataDir = platform.MustDataDir()
 	}
-	systemLogDir := filepath.Join(dataDir, "system_logs")
+	systemLogDir := logging.SystemLogDir(dataDir)
 
 	logs.WriteString("=== Application System Logs ===\n")
 	if entries, err := os.ReadDir(systemLogDir); err == nil {
