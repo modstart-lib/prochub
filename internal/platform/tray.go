@@ -105,7 +105,13 @@ func (t *TrayManager) onReady() {
 	// right click shows the context menu (the systray default). On other
 	// platforms the left click keeps the default behavior (show the menu).
 	if goruntime.GOOS == "windows" {
-		systray.SetOnTapped(t.showWindow)
+		// The tapped callback runs inside the tray window procedure on the
+		// message loop. restoreMainWindowNative makes cross-thread Win32 calls
+		// (ShowWindow/SetForegroundWindow) that can block while the main thread
+		// is busy; blocking there would freeze the tray loop and leave the icon
+		// unresponsive. Hand the restore to a separate goroutine so the message
+		// loop returns immediately.
+		systray.SetOnTapped(func() { go t.showWindow() })
 	}
 
 	// Get labels based on app configuration
@@ -210,6 +216,18 @@ func (t *TrayManager) quitApp() {
 // platforms it calls start() directly.
 func (t *TrayManager) Run() {
 	if goruntime.GOOS == "windows" {
+		// fyne.io/systray creates the hidden tray window and pumps its message
+		// loop with GetMessageW on the calling goroutine. GetMessageW only
+		// retrieves messages from the calling OS thread's queue, and Windows
+		// delivers the tray window's messages (icon clicks, TaskbarCreated) to
+		// the thread that created the window. Run() is started in a new
+		// goroutine, and without LockOSThread the Go scheduler may migrate it
+		// to another OS thread after a while: GetMessageW then blocks on the
+		// wrong thread's queue, so the icon silently stops responding (no
+		// left/right click, and no re-register after an explorer restart).
+		// LockOSThread keeps the loop on the thread that owns the window
+		// (systray's own Windows test locks the thread for the same reason).
+		goruntime.LockOSThread()
 		systray.Run(t.onReady, t.onExit)
 		return
 	}

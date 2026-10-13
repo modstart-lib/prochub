@@ -2,6 +2,7 @@
 
 ## [unreleased]
 
+- 修复：Windows 托盘图标运行一段时间后失去响应（无法双击唤起窗口、无法右键菜单、无法退出）——托盘消息循环由 `go trayManager.Run()` 在新 goroutine 中运行，而 `fyne.io/systray` 用 `GetMessageW` 在调用线程上抽取消息、Windows 又把窗口消息投递到创建窗口的线程，goroutine 被调度器迁移到其它 OS 线程后即抽错队列、消息再也无法分发；现于 `Run()` 的 Windows 分支调用 `runtime.LockOSThread()` 把消息循环固定在拥有窗口的线程上，并把托盘左键回调改到独立 goroutine 执行，避免 `ShowWindow`/`SetForegroundWindow` 等跨线程调用阻塞消息循环
 - 修复：Windows 下守护启动的控制台子进程日志中文乱码——子进程输出被重定向到管道时按系统 ANSI 代码页（简体中文为 CP936/GBK）而非 UTF-8 编码，现统一解码为 UTF-8 后再落盘与推送（`internal/platform` 新增 `DecodeOutput`，按代码页转码 UTF-8 直通）；同时修复系统信息中 `osVersion` 同类乱码（如「版本」显示为「�汾」）
 - 新增：进程新增/编辑弹窗的环境变量支持「文本导入」——粘贴标准 `.env` 文本（每行 `KEY=VALUE`，支持 `#` 注释、空行与引号包裹的值）一键导入，同名键覆盖已有值、新键追加
 - 测试：新增环境变量文本导入 UI 测试（解析去重、覆盖已有键、导入弹窗开关、编辑弹窗导入）
