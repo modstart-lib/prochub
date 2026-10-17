@@ -3,6 +3,7 @@ import { Button, Spin, Switch, Tag, Tooltip } from 'ant-design-vue'
 import { Eye, FileText, Hash, Pencil, Play, RefreshCw, RotateCw, Square } from 'lucide-vue-next'
 import type { ProcessItem } from '@/stores/app'
 import { useAppStore } from '@/stores/app'
+import MiddleEllipsisViewer from '@/components/MiddleEllipsisViewer.vue'
 
 const props = defineProps<{ process: ProcessItem; loading: boolean }>()
 const emit = defineEmits<{
@@ -49,7 +50,9 @@ const onAutoStartChange = (checked: boolean | string | number) => {
 
       <!-- Middle: command -->
       <div class="card-command">
-        <code class="command-text">{{ process.command }}</code>
+        <code class="command-text">
+          <MiddleEllipsisViewer :text="process.command" />
+        </code>
       </div>
 
       <div v-if="process.lastError" class="card-error">
@@ -57,9 +60,9 @@ const onAutoStartChange = (checked: boolean | string | number) => {
         <span class="error-text">{{ process.lastError }}</span>
       </div>
 
-      <!-- Last row: id + actions -->
-      <div class="card-meta">
-        <div class="meta-left">
+      <!-- Footer pinned to the bottom: run info row + id/actions row -->
+      <div class="card-footer">
+        <div class="card-info">
           <div class="meta-item">
             <Switch
               :checked="process.autoStart"
@@ -78,40 +81,42 @@ const onAutoStartChange = (checked: boolean | string | number) => {
             <RefreshCw class="w-3 h-3" aria-hidden="true" />
             <span>{{ appStore.t('processes.restarts') }}: {{ process.restarts }}</span>
           </div>
-          <div class="meta-item meta-id" :title="process.id">#{{ process.id }}</div>
         </div>
-        <div class="card-actions">
-          <Tooltip :title="appStore.t('actions.detail')">
-            <Button :aria-label="appStore.t('actions.detail')" @click="emit('detail', process)">
-              <Eye class="w-4 h-4" aria-hidden="true" />
-            </Button>
-          </Tooltip>
-          <Tooltip :title="appStore.t('actions.restart')">
-            <Button :disabled="process.status === 'stopped'" :aria-label="appStore.t('actions.restart')" @click="emit('restart', process)">
-              <RotateCw class="w-4 h-4" aria-hidden="true" />
-            </Button>
-          </Tooltip>
-          <Tooltip :title="appStore.t('actions.logs')">
-            <Button :aria-label="appStore.t('actions.logs')" @click="emit('logs', process)">
-              <FileText class="w-4 h-4" aria-hidden="true" />
-            </Button>
-          </Tooltip>
-          <Tooltip :title="appStore.t('actions.settings')">
-            <Button :disabled="isActive(process)" :aria-label="appStore.t('actions.settings')" @click="emit('edit', process)">
-              <Pencil class="w-4 h-4" aria-hidden="true" />
-            </Button>
-          </Tooltip>
-          <Tooltip :title="isActive(process) ? appStore.t('actions.stop') : appStore.t('actions.start')">
-            <Button
-              :type="isActive(process) ? 'default' : 'primary'"
-              :danger="isActive(process)"
-              :aria-label="isActive(process) ? appStore.t('actions.stop') : appStore.t('actions.start')"
-              @click="emit('start', process)"
-            >
-              <Square v-if="isActive(process)" class="w-4 h-4" aria-hidden="true" />
-              <Play v-else class="w-4 h-4" aria-hidden="true" />
-            </Button>
-          </Tooltip>
+        <div class="card-meta">
+          <div class="meta-id" :title="process.id">#{{ process.id }}</div>
+          <div class="card-actions">
+            <Tooltip :title="appStore.t('actions.detail')">
+              <Button :aria-label="appStore.t('actions.detail')" @click="emit('detail', process)">
+                <Eye class="w-4 h-4" aria-hidden="true" />
+              </Button>
+            </Tooltip>
+            <Tooltip :title="appStore.t('actions.restart')">
+              <Button :disabled="process.status === 'stopped'" :aria-label="appStore.t('actions.restart')" @click="emit('restart', process)">
+                <RotateCw class="w-4 h-4" aria-hidden="true" />
+              </Button>
+            </Tooltip>
+            <Tooltip :title="appStore.t('actions.logs')">
+              <Button :aria-label="appStore.t('actions.logs')" @click="emit('logs', process)">
+                <FileText class="w-4 h-4" aria-hidden="true" />
+              </Button>
+            </Tooltip>
+            <Tooltip :title="appStore.t('actions.settings')">
+              <Button :disabled="isActive(process)" :aria-label="appStore.t('actions.settings')" @click="emit('edit', process)">
+                <Pencil class="w-4 h-4" aria-hidden="true" />
+              </Button>
+            </Tooltip>
+            <Tooltip :title="isActive(process) ? appStore.t('actions.stop') : appStore.t('actions.start')">
+              <Button
+                :type="isActive(process) ? 'default' : 'primary'"
+                :danger="isActive(process)"
+                :aria-label="isActive(process) ? appStore.t('actions.stop') : appStore.t('actions.start')"
+                @click="emit('start', process)"
+              >
+                <Square v-if="isActive(process)" class="w-4 h-4" aria-hidden="true" />
+                <Play v-else class="w-4 h-4" aria-hidden="true" />
+              </Button>
+            </Tooltip>
+          </div>
         </div>
       </div>
     </div>
@@ -120,7 +125,7 @@ const onAutoStartChange = (checked: boolean | string | number) => {
 
 <style scoped>
 .process-card {
-  @apply h-full rounded-xl border border-slate-200/80 bg-gradient-to-br from-white to-slate-50/50 p-4 transition-shadow duration-200 hover:shadow-md dark:border-slate-700/80 dark:from-slate-800 dark:to-slate-900/50;
+  @apply flex h-full flex-col rounded-xl border border-slate-200/80 bg-gradient-to-br from-white to-slate-50/50 p-4 transition-shadow duration-200 hover:shadow-md dark:border-slate-700/80 dark:from-slate-800 dark:to-slate-900/50;
 }
 
 .process-card-running {
@@ -128,11 +133,11 @@ const onAutoStartChange = (checked: boolean | string | number) => {
 }
 
 .card-header {
-  @apply mb-3 flex items-center justify-between;
+  @apply mb-3 flex items-start justify-between gap-2;
 }
 
 .card-title-section {
-  @apply flex items-center gap-2;
+  @apply flex min-w-0 items-center gap-2;
 }
 
 .status-indicator {
@@ -164,11 +169,11 @@ const onAutoStartChange = (checked: boolean | string | number) => {
 }
 
 .card-title {
-  @apply text-base font-semibold text-slate-800 dark:text-slate-200;
+  @apply min-w-0 break-words text-base font-semibold text-slate-800 dark:text-slate-200;
 }
 
 .status-tag {
-  @apply text-xs font-medium;
+  @apply flex-shrink-0 text-xs font-medium;
 }
 
 .card-command {
@@ -176,7 +181,7 @@ const onAutoStartChange = (checked: boolean | string | number) => {
 }
 
 .command-text {
-  @apply break-all font-mono text-xs text-slate-600 dark:text-slate-400;
+  @apply block font-mono text-xs text-slate-600 dark:text-slate-400;
 }
 
 .card-error {
@@ -191,16 +196,20 @@ const onAutoStartChange = (checked: boolean | string | number) => {
   @apply text-xs text-red-600 dark:text-red-400;
 }
 
-.card-meta {
-  @apply flex flex-wrap items-center justify-between gap-4 text-xs text-slate-500 dark:text-slate-400;
+.card-footer {
+  @apply mt-auto flex flex-col gap-2;
 }
 
-.meta-left {
-  @apply flex min-w-0 flex-wrap items-center gap-4;
+.card-info {
+  @apply flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400;
+}
+
+.card-meta {
+  @apply flex items-center justify-between gap-3;
 }
 
 .meta-item {
-  @apply flex items-center gap-1;
+  @apply flex items-center gap-1 whitespace-nowrap;
 }
 
 .meta-label {
@@ -208,10 +217,10 @@ const onAutoStartChange = (checked: boolean | string | number) => {
 }
 
 .meta-id {
-  @apply max-w-[240px] truncate font-mono;
+  @apply min-w-0 flex-1 truncate font-mono text-xs text-slate-500 dark:text-slate-400;
 }
 
 .card-actions {
-  @apply flex items-center gap-2;
+  @apply flex flex-shrink-0 items-center gap-2;
 }
 </style>
