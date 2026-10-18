@@ -138,6 +138,14 @@ func (a *App) startup(ctx context.Context) {
 		logger.store.Append(entry)
 	})
 
+	// Record every spawn/exit/restart/stop to the system log so a stray child
+	// process (one entry with two children) can be traced back to its entry,
+	// trigger and reason instead of only being visible in the OS process list.
+	a.pm.SetLifecycleCallback(func(ev process.LifecycleEvent) {
+		a.LogSystemError("process."+string(ev.Action), fmt.Sprintf(
+			"id=%s pid=%d reason=%s command=%s", ev.ID, ev.PID, ev.Reason, ev.Command))
+	})
+
 	
 
 	// Register saved processes
@@ -734,7 +742,7 @@ var appConfig = struct {
 	Name:            "ProcHub",
 	Title:           "ProcHub",
 	Slogan:          "Manage processes easily",
-	Version:         "0.7.0",
+	Version:         "0.8.0-beta",
 	Website:         baseURL,
 	WebsiteGithub:   "https://github.com/modstart-lib/prochub",
 	WebsiteGitee:    "https://gitee.com/modstart-lib/prochub",
