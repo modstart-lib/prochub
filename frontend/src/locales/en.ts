@@ -113,6 +113,7 @@ export default {
     pickCommand: 'Select command file',
     pickWorkingDir: 'Select working directory',
     count: '{count} total',
+    groupByStatus: 'Group',
     filter: {
       all: 'All',
     },

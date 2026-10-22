@@ -113,6 +113,7 @@ export default {
     pickCommand: '选择命令文件',
     pickWorkingDir: '选择工作目录',
     count: '共 {count} 个',
+    groupByStatus: '按状态分组',
     filter: {
       all: '全部',
     },

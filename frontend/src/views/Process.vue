@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { Button, InputSearch, Segmented, message } from 'ant-design-vue'
+import { Button, InputSearch, Segmented, Switch, message } from 'ant-design-vue'
 import { Cpu, Plus } from 'lucide-vue-next'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { ProcessItem, ProcessStatus } from '../stores/app'
@@ -15,6 +15,8 @@ import { testActionSet, testActionUnset } from '@/utils/test'
 
 type StatusFilter = 'all' | 'running' | 'stopped' | 'errored'
 
+const GROUP_BY_STATUS_KEY = 'processGrouped'
+
 const appStore = useAppStore()
 const showModal = ref(false)
 const showEditModal = ref(false)
@@ -26,6 +28,9 @@ const detailProcessId = ref('')
 const searchQuery = ref('')
 const statusFilter = ref<StatusFilter>('all')
 const loadingProcessId = ref<string | null>(null)
+// Status grouping is a preference: grouped view keeps active processes on top,
+// flat view keeps every card in a fixed slot so nothing jumps on start/stop.
+const groupByStatus = ref(localStorage.getItem(GROUP_BY_STATUS_KEY) !== '0')
 
 // Active processes cover both running and the transient starting state.
 const isActiveStatus = (status: ProcessStatus) => status === 'running' || status === 'starting'
@@ -80,7 +85,20 @@ const groupedProcesses = computed(() =>
     .filter((g) => g.items.length > 0)
 )
 
-const showGroupHeaders = computed(() => statusFilter.value === 'all')
+const showGroupHeaders = computed(() => groupByStatus.value && statusFilter.value === 'all')
+
+// Rendered sections: status groups when grouping is on, otherwise one flat section
+// whose cards keep their ID order (positions stay put when one of them starts).
+const displayGroups = computed(() =>
+  groupByStatus.value
+    ? groupedProcesses.value
+    : [{ key: 'all', label: '', items: filteredProcesses.value }]
+)
+
+const onGroupByStatusChange = (checked: boolean | string | number) => {
+  groupByStatus.value = !!checked
+  localStorage.setItem(GROUP_BY_STATUS_KEY, groupByStatus.value ? '1' : '0')
+}
 
 const emptyDescription = computed(() =>
   appStore.processes.length === 0 ? appStore.t('processes.empty') : appStore.t('processes.noMatch')
@@ -111,8 +129,12 @@ onMounted(() => {
     statusFilter.value = (params as { filter: StatusFilter }).filter
   })
   testActionSet('Process.getGroups', () =>
-    groupedProcesses.value.map((g) => ({ key: g.key, count: g.items.length }))
+    displayGroups.value.map((g) => ({ key: g.key, count: g.items.length }))
   )
+  testActionSet('Process.getGroupByStatus', () => groupByStatus.value)
+  testActionSet('Process.setGroupByStatus', (params: unknown) => {
+    onGroupByStatusChange((params as { enabled: boolean }).enabled)
+  })
   testActionSet('Process.addModal.show', () => { showModal.value = true })
   testActionSet('Process.addModal.hide', () => { showModal.value = false })
   testActionSet('Process.addModal.isVisible', () => showModal.value)
@@ -169,7 +191,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  testActionUnset(['Process.getStatusFilter', 'Process.setStatusFilter', 'Process.getGroups', 'Process.detailModal.isVisible', 'Process.detailModal.show', 'Process.detailModal.hide'])
+  testActionUnset(['Process.getStatusFilter', 'Process.setStatusFilter', 'Process.getGroups', 'Process.getGroupByStatus', 'Process.setGroupByStatus', 'Process.detailModal.isVisible', 'Process.detailModal.show', 'Process.detailModal.hide'])
 })
 
 const openEditModal = (process: ProcessItem) => {
@@ -257,22 +279,31 @@ const handleDetail = (process: ProcessItem) => {
     <!-- Dashboard summary -->
     <ProcessDashboardSummary />
 
-    <!-- Status filter -->
+    <!-- Status filter + grouping switch -->
     <div class="process-toolbar">
       <Segmented :value="statusFilter" :options="filterOptions" @change="onStatusFilterChange" />
+      <div class="group-toggle">
+        <Switch
+          :checked="groupByStatus"
+          size="small"
+          :aria-label="appStore.t('processes.groupByStatus')"
+          @change="onGroupByStatusChange"
+        />
+        <span class="group-toggle-label">{{ appStore.t('processes.groupByStatus') }}</span>
+      </div>
     </div>
 
     <!-- Process List -->
     <AppEmptyState v-if="filteredProcesses.length === 0" :description="emptyDescription" />
 
-    <div v-else class="process-groups">
-      <section v-for="group in groupedProcesses" :key="group.key" class="process-group">
+    <TransitionGroup v-else name="process-group" tag="div" class="process-groups">
+      <section v-for="group in displayGroups" :key="group.key" class="process-group">
         <div v-if="showGroupHeaders" class="group-header">
           <span class="group-dot" :class="`group-dot-${group.key}`" aria-hidden="true"></span>
           <span class="group-title">{{ group.label }}</span>
           <span class="group-count">{{ group.items.length }}</span>
         </div>
-        <div class="process-grid">
+        <TransitionGroup name="process-card" tag="div" class="process-grid">
           <ProcessCard
             v-for="process in group.items"
             :key="process.id"
@@ -285,9 +316,9 @@ const handleDetail = (process: ProcessItem) => {
             @edit="openEditModal"
             @auto-start-change="handleAutoStartToggle"
           />
-        </div>
+        </TransitionGroup>
       </section>
-    </div>
+    </TransitionGroup>
 
     <!-- 模态框 -->
     <ProcessAddModal v-model:visible="showModal" />
@@ -335,7 +366,15 @@ const handleDetail = (process: ProcessItem) => {
 }
 
 .process-toolbar {
-  @apply flex items-center;
+  @apply flex flex-wrap items-center justify-between gap-3;
+}
+
+.group-toggle {
+  @apply flex items-center gap-2;
+}
+
+.group-toggle-label {
+  @apply text-xs text-slate-500 dark:text-slate-400;
 }
 
 .process-groups {
@@ -376,12 +415,36 @@ const handleDetail = (process: ProcessItem) => {
 
 /* Responsive multi-column grid so many processes stay visible without a long scroll. */
 .process-grid {
-  @apply grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3;
+  @apply relative grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3;
 }
 
 /* Stretch cards to the row height so grid siblings line up. */
 .process-grid :deep(.ant-spin-nested-loading),
 .process-grid :deep(.ant-spin-container) {
   height: 100%;
+}
+
+/* Sections glide down/up when a status group appears or disappears. */
+.process-group-move {
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Cards glide to their new slot when the grid reorders (start/stop, filter, grouping switch). */
+.process-card-move {
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.process-card-enter-active {
+  transition: opacity 0.24s ease, transform 0.24s ease;
+}
+
+.process-card-enter-from {
+  opacity: 0;
+  transform: scale(0.96) translateY(6px);
+}
+
+/* Leaving cards drop out of the flow at once, so remaining cards can glide into place. */
+.process-card-leave-active {
+  @apply absolute invisible;
 }
 </style>
