@@ -6,17 +6,23 @@ import (
 	"os"
 	goruntime "runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"fyne.io/systray"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-// quitFallbackTimeout bounds how long the graceful quit may take before the
-// process exits on its own. The tray menu is the only way to quit once the
-// window is hidden, so a stalled Wails quit path must not leave the app
-// running without any way to close it.
-const quitFallbackTimeout = 3 * time.Second
+// quitFallbackTimeout bounds how long a quit may take before the process exits
+// on its own. The tray menu is the only way to quit once the window is hidden,
+// so a stalled quit path (a hung Wails message-loop callback, a blocked log
+// write, a stuck process snapshot, a wedged native call, ...) must never leave
+// the app running with no way to close it.
+const quitFallbackTimeout = 2 * time.Second
+
+// quitStateTimeout bounds the process-state query done when the tray quit is
+// clicked. It is normally answered in microseconds.
+const quitStateTimeout = time.Second
 
 // AppRef defines the interface TrayManager needs from the main App.
 // This avoids a circular import between internal/platform and package main.
@@ -32,6 +38,9 @@ type AppRef interface {
 	// NotifyQuitBlocked informs the frontend that the quit was blocked
 	// because some processes are still running.
 	NotifyQuitBlocked(names []string)
+	// DescribeProcesses renders the current process state (status, pid,
+	// restarts) for the diagnostic line written around a quit.
+	DescribeProcesses() string
 	// LogSystemError writes a line to the application system log so tray
 	// interactions can be diagnosed from a user's log file.
 	LogSystemError(component, message string)
@@ -44,14 +53,35 @@ type TrayManager struct {
 	trayIconWindows []byte
 	mShow           *systray.MenuItem
 	mQuit           *systray.MenuItem
+	// logCh feeds the diagnostic log writer so tray lines keep their order
+	// without any tray action ever waiting on a disk write.
+	logCh chan string
+	// quitMu guards quitStageName, the last quit step started, which the
+	// fallback reports when a quit never completes.
+	quitMu        sync.Mutex
+	quitStageName string
 }
 
 // NewTrayManager creates a new TrayManager
 func NewTrayManager(app AppRef, trayIcon []byte, trayIconWindows []byte) *TrayManager {
-	return &TrayManager{
+	t := &TrayManager{
 		app:             app,
 		trayIcon:        trayIcon,
 		trayIconWindows: trayIconWindows,
+		logCh:           make(chan string, 128),
+	}
+	go t.drainLogs()
+	return t
+}
+
+// drainLogs writes queued tray lines one by one, keeping their order and moving
+// the disk write off the tray's own goroutines.
+func (t *TrayManager) drainLogs() {
+	for message := range t.logCh {
+		if t.app == nil {
+			continue
+		}
+		t.app.LogSystemError("tray", message)
 	}
 }
 
@@ -100,8 +130,25 @@ func isChineseLocale() bool {
 	return false
 }
 
-// logSystem writes a tray interaction into the application system log.
+// logSystem queues a tray interaction for the application system log. Lines keep
+// their order, and the caller never waits: a slow or hung log write must not be
+// able to stall the tray menu, most importantly the quit path these lines exist
+// to diagnose. Lines are dropped only if the queue is full, which needs a
+// back-log of over a hundred pending writes.
 func (t *TrayManager) logSystem(format string, args ...interface{}) {
+	if t.app == nil {
+		return
+	}
+	message := fmt.Sprintf(format, args...)
+	select {
+	case t.logCh <- message:
+	default:
+	}
+}
+
+// logSystemSync writes a tray line immediately. Used right before the process
+// ends, when a queued line would be lost.
+func (t *TrayManager) logSystemSync(format string, args ...interface{}) {
 	if t.app == nil {
 		return
 	}
@@ -130,7 +177,10 @@ func (t *TrayManager) onReady() {
 		// is busy; blocking there would freeze the tray loop and leave the icon
 		// unresponsive. Hand the restore to a separate goroutine so the message
 		// loop returns immediately.
-		systray.SetOnTapped(func() { go t.showWindow() })
+		systray.SetOnTapped(func() {
+			t.logSystem("Tray icon tapped")
+			go t.showWindow()
+		})
 	}
 
 	// Get labels based on app configuration
@@ -156,6 +206,7 @@ func (t *TrayManager) onReady() {
 		for {
 			select {
 			case <-t.mShow.ClickedCh:
+				t.logSystem("Show window clicked")
 				go t.showWindow()
 			case <-t.mQuit.ClickedCh:
 				go t.quitApp()
@@ -189,9 +240,17 @@ func ShowMainWindow(ctx context.Context) {
 // showWindow shows the main application window and Dock icon
 func (t *TrayManager) showWindow() {
 	if t.app == nil {
+		t.logSystem("Show window: tray has no app reference")
 		return
 	}
+	if t.app.GetCtx() == nil {
+		t.logSystem("Show window: no Wails context, doing nothing")
+		return
+	}
+	start := time.Now()
+	t.logSystem("Show window: clicked (%s)", DescribeMainWindow())
 	ShowMainWindow(t.app.GetCtx())
+	t.logSystem("Show window: restored in %s", time.Since(start).Round(time.Millisecond))
 }
 
 // quitApp quits the application, but only when every managed process has been
@@ -202,44 +261,130 @@ func (t *TrayManager) quitApp() {
 	t.logSystem("Quit requested from tray menu")
 
 	if t.app == nil {
+		t.logSystem("Quit: tray has no app reference, stopping the tray only")
 		systray.Quit()
 		return
 	}
 
+	// The fallback is armed before anything else can block, so every step below
+	// (state query, native window restore, the Wails quit hand-off) is covered.
+	// A quit that is refused because processes are running stops the guard
+	// instead, so the fallback only ever fires for a quit the user could expect
+	// to succeed.
+	guard := time.AfterFunc(quitFallbackTimeout, func() {
+		t.exitWithLog("Quit stalled for %s, forcing process exit (last step: %s)", quitFallbackTimeout, t.quitStage())
+	})
+	t.setQuitStage("state query")
+	// The full snapshot goes out on its own goroutine: it is diagnostic only and
+	// must not delay (or be able to delay) the quit.
+	go t.logProcessSnapshot()
+
+	queryStart := time.Now()
+	names, ok := t.runningNames(quitStateTimeout)
+	if !ok {
+		// The process state could not be read in time. The user asked to quit and
+		// the manager is wedged, so leaving the app unclosable is worse than
+		// skipping the running-process guard.
+		t.exitWithLog("Quit forced: process state unavailable within %s", quitStateTimeout)
+	}
+	t.logSystem("Quit: state query returned %d running process(es) %v in %s",
+		len(names), names, time.Since(queryStart).Round(time.Millisecond))
+
 	// Block quitting while processes are still running.
-	if names := t.app.RunningProcessNames(); len(names) > 0 {
+	if len(names) > 0 {
+		guard.Stop()
 		t.logSystem("Quit blocked, %d process(es) still running: %v", len(names), names)
 		// Bring the window back so the user can see the warning.
-		t.showWindow()
+		go t.showWindow()
 		t.app.NotifyQuitBlocked(names)
+		t.logSystem("Quit blocked: quit-blocked event emitted to the frontend")
 		return
 	}
 
 	// Allow the window close handler to proceed (instead of only hiding).
+	t.setQuitStage("prepare quit")
 	t.app.PrepareQuit()
-
-	// Wails requests the exit from the main thread's message loop; if that
-	// never completes (a stuck window procedure, a modal loop, ...) the user
-	// would be left with an app that cannot be closed at all, so arm a fallback
-	// that terminates the process even when the graceful path stalls.
-	t.forceExitAfter(quitFallbackTimeout)
+	t.logSystem("Quit: app marked as quitting")
 
 	if ctx := t.app.GetCtx(); ctx != nil {
+		// On Windows, ask the window thread's queue to end its message loop
+		// directly. This is the same exit Wails performs, minus the hand-off
+		// through its invoke message, which is the step observed to stop working
+		// after the app had been running for a long time. When the window cannot
+		// be found, fall back to Wails' own quit.
+		t.setQuitStage("post WM_QUIT to the main window thread")
+		posted, detail := PostQuitToMainWindow()
+		t.logSystem("Quit: WM_QUIT post %s (%s)", postedVerb(posted), detail)
+		if posted {
+			return
+		}
+		t.setQuitStage("runtime.Quit")
+		t.logSystem("Quit: falling back to runtime.Quit")
 		runtime.Quit(ctx)
 		return
 	}
+	t.logSystem("Quit: no Wails context, stopping the tray only")
+	guard.Stop()
 	systray.Quit()
 }
 
-// forceExitAfter terminates the process when the graceful quit did not finish
-// within d. Nothing is running at this point (quit is blocked otherwise), so
-// only the process-level teardown (control server auth file removal) is lost.
-func (t *TrayManager) forceExitAfter(d time.Duration) {
-	go func() {
-		time.Sleep(d)
-		t.logSystem("Graceful quit did not finish within %s, forcing process exit", d)
-		os.Exit(0)
-	}()
+// postedVerb turns the PostQuitToMainWindow result into the word used in the log.
+func postedVerb(posted bool) string {
+	if posted {
+		return "succeeded"
+	}
+	return "failed"
+}
+
+// setQuitStage records how far the current quit got, so a stalled quit reports
+// the step it never came back from.
+func (t *TrayManager) setQuitStage(stage string) {
+	t.quitMu.Lock()
+	t.quitStageName = stage
+	t.quitMu.Unlock()
+}
+
+// quitStage returns the last quit step started.
+func (t *TrayManager) quitStage() string {
+	t.quitMu.Lock()
+	defer t.quitMu.Unlock()
+	return t.quitStageName
+}
+
+// logProcessSnapshot records every process entry with its status and pid, so a
+// report shows why a quit was blocked (or why the app believed nothing ran).
+func (t *TrayManager) logProcessSnapshot() {
+	detail := t.app.DescribeProcesses()
+	if detail == "" {
+		return
+	}
+	t.logSystem("Quit: %s", detail)
+}
+
+// runningNames returns the names of the running processes within timeout. ok is
+// false when the query did not answer in time, which happens when the process
+// manager is wedged on its own lock.
+func (t *TrayManager) runningNames(timeout time.Duration) (names []string, ok bool) {
+	done := make(chan []string, 1)
+	go func() { done <- t.app.RunningProcessNames() }()
+
+	select {
+	case names = <-done:
+		return names, true
+	case <-time.After(timeout):
+		return nil, false
+	}
+}
+
+// exitWithLog records why the process is being forced to end and then ends it.
+// A short watchdog ends the process even when that write hangs: the line exists
+// to explain the exit, it must never be able to keep the app alive.
+func (t *TrayManager) exitWithLog(format string, args ...interface{}) {
+	time.AfterFunc(300*time.Millisecond, func() { os.Exit(0) })
+	if t.app != nil {
+		t.app.LogSystemError("tray", fmt.Sprintf(format, args...))
+	}
+	os.Exit(0)
 }
 
 // Run starts the systray.
@@ -263,6 +408,7 @@ func (t *TrayManager) forceExitAfter(d time.Duration) {
 // platform-specifically: on Darwin it uses dispatch_async(main_queue), on other
 // platforms it calls start() directly.
 func (t *TrayManager) Run() {
+	t.logSystem("Tray starting (platform=%s, go=%s)", goruntime.GOOS, goruntime.Version())
 	if goruntime.GOOS == "windows" {
 		// fyne.io/systray creates the hidden tray window and pumps its message
 		// loop with GetMessageW on the calling goroutine. GetMessageW only
@@ -285,5 +431,6 @@ func (t *TrayManager) Run() {
 
 // Quit stops the systray
 func (t *TrayManager) Quit() {
+	t.logSystemSync("Tray shutdown requested, stopping the tray icon")
 	systray.Quit()
 }

@@ -927,6 +927,7 @@ func (a *App) HideWindow() {
 // stops preventing the close. Implements platform.AppRef.
 func (a *App) PrepareQuit() {
 	defer a.recoverPanic("PrepareQuit")
+	a.logLifecycle("quit prepared: window close will now let the app exit")
 	SetQuitting(true)
 }
 
@@ -950,10 +951,38 @@ func (a *App) NotifyQuitBlocked(names []string) {
 	})
 }
 
+// DescribeProcesses renders every process entry with its status and pid. It is
+// logged around a tray quit so a report shows why the quit was blocked (or why
+// the app believed nothing was running). Implements platform.AppRef.
+func (a *App) DescribeProcesses() string {
+	defer a.recoverPanic("DescribeProcesses")
+
+	snapshots := a.pm.List()
+	if len(snapshots) == 0 {
+		return "no processes configured"
+	}
+
+	parts := make([]string, 0, len(snapshots))
+	for _, snapshot := range snapshots {
+		name := snapshot.Definition.Name
+		if name == "" {
+			name = snapshot.Definition.ID
+		}
+		part := fmt.Sprintf("%s(%s) status=%s pid=%d restarts=%d",
+			name, snapshot.Definition.ID, snapshot.Status, snapshot.PID, snapshot.Restarts)
+		if snapshot.LastError != "" {
+			part += " lastError=" + snapshot.LastError
+		}
+		parts = append(parts, part)
+	}
+	return "processes: " + strings.Join(parts, "; ")
+}
+
 // QuitApp quits the application. Quitting is blocked while any process is still
 // running: the window is shown and the frontend displays a warning instead.
 func (a *App) QuitApp() {
 	defer a.recoverPanic("QuitApp")
+	a.logLifecycle("quit requested from the frontend")
 	if names := a.pm.RunningNames(); len(names) > 0 {
 		platform.ShowMainWindow(a.ctx)
 		a.NotifyQuitBlocked(names)

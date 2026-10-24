@@ -49,6 +49,16 @@ func SetQuitting(v bool) {
 	quitting.Store(v)
 }
 
+// logLifecycle records an application lifecycle step (window close handling,
+// shutdown). The write runs in its own goroutine: lifecycle code runs on the
+// window thread and on the quit path, neither of which may wait for disk IO.
+func (a *App) logLifecycle(message string) {
+	if a == nil {
+		return
+	}
+	go a.LogSystemError("lifecycle", message)
+}
+
 // UpdateTrayLanguage updates the system tray menu language
 func UpdateTrayLanguage() {
 	if trayManager != nil {
@@ -105,12 +115,14 @@ func wrapStartup(app *App) func(ctx context.Context) {
 // wrapShutdown wraps the app shutdown to cleanup the tray
 func wrapShutdown(app *App) func(ctx context.Context) {
 	return func(ctx context.Context) {
+		app.logLifecycle("shutdown: stopping the tray")
 		// Stop systray
 		if trayManager != nil {
 			trayManager.Quit()
 		}
 		// Call original shutdown
 		app.shutdown(ctx)
+		app.logLifecycle("shutdown: complete, process is exiting")
 	}
 }
 
@@ -168,12 +180,14 @@ func main() {
 		// is set first so the close is allowed to proceed and the app exits.
 		OnBeforeClose: func(ctx context.Context) (prevent bool) {
 			if quitting.Load() {
+				app.logLifecycle("window close allowed: app is quitting")
 				return false
 			}
 			// Hide the window
 			runtime.WindowHide(ctx)
 			// Hide Dock icon on macOS
 			platform.HideDockIcon()
+			app.logLifecycle("window close prevented: window and dock icon hidden")
 			// Prevent the default close behavior (quitting the app)
 			return true
 		},
