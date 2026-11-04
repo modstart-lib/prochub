@@ -35,6 +35,8 @@ const usageText = `ProcHub 命令行工具
   prochub wsl stop                            停止 WSL
   prochub wsl restart                         重启 WSL
   prochub status                              查看运行状态
+  prochub update check                        检查最新版本
+  prochub update download                     检查并下载、校验最新版本
   prochub version                             查看版本
 
 说明：
@@ -50,6 +52,7 @@ var cliCommands = map[string]bool{
 	"config":    true,
 	"wsl":       true,
 	"status":    true,
+	"update":    true,
 	"version":   true,
 	"help":      true,
 	"-h":        true,
@@ -78,6 +81,10 @@ func Run(args []string, opts Options) int {
 	case "version", "-v", "--version":
 		fmt.Fprintf(opts.Stdout, "ProcHub %s\n", opts.Version)
 		return 0
+	case "update":
+		// Update commands talk to the release backend directly and must work
+		// even when the GUI is not running.
+		return runUpdate(args[1:], opts)
 	}
 
 	client, err := control.NewClient(opts.DataDir)

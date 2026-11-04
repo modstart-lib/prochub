@@ -22,6 +22,7 @@ import (
 	"prochub/internal/process"
 	"prochub/internal/service"
 	"prochub/internal/store"
+	"prochub/internal/updater"
 
 	"github.com/google/uuid"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -45,6 +46,7 @@ type App struct {
 	controlServer *control.Server
 	systemLogger  *logging.RollingStore
 	wailsLogger   *logging.WailsLogger
+	updateMgr     *updater.Manager
 	dataDir       string
 	// configMu serializes configuration writes. Reads and writes can originate
 	// from the GUI, the CLI control server and the tray at the same time, so
@@ -65,7 +67,7 @@ type ProcessLogger struct {
 func NewApp() *App {
 	dataDir := platform.MustDataDir()
 
-	return &App{
+	app := &App{
 		dataDir:      dataDir,
 		pm:           process.NewManager(),
 		store:        store.NewStore(dataDir),
@@ -75,6 +77,30 @@ func NewApp() *App {
 		wslMgr:       service.NewWSLManager(),
 		wailsLogger:  logging.NewWailsLogger(),
 	}
+	app.updateMgr = updater.New(updater.Options{
+		Endpoint:       updateEndpoint(),
+		CurrentVersion: appConfig.Version,
+		DataDir:        dataDir,
+		UserAgent:      fmt.Sprintf("AppOpen/%s/%s", appConfig.Name, appConfig.Version),
+		Platform:       updater.CurrentPlatform(),
+		// Updates require a full stop, exactly like quitting: no managed
+		// process may keep running while the installation is replaced.
+		RunningProcesses: func() []string { return app.pm.ActiveNames() },
+		OnEvent: func(ev updater.Event) {
+			if app.ctx != nil {
+				runtime.EventsEmit(app.ctx, ev.Type, ev.State)
+			}
+		},
+	})
+	return app
+}
+
+// updateEndpoint allows local testing against a development backend.
+func updateEndpoint() string {
+	if value := os.Getenv("PROCHUB_UPDATE_ENDPOINT"); value != "" {
+		return value
+	}
+	return appConfig.VersionCheckUrl
 }
 
 // GetLocale returns the current app locale, implementing platform.AppRef
@@ -991,6 +1017,58 @@ func (a *App) QuitApp() {
 
 	SetQuitting(true)
 	runtime.Quit(a.ctx)
+}
+
+// CheckUpdate queries the update backend (or GitHub) and returns the state.
+func (a *App) CheckUpdate(channel string) (updater.State, error) {
+	defer a.recoverPanic("CheckUpdate")
+	if channel != "" {
+		a.updateMgr.SetChannel(channel)
+	}
+	return a.updateMgr.Check(a.ctx)
+}
+
+// StartUpdateDownload downloads the newest asset in the background. Progress
+// and the final state are pushed through the update:state event.
+func (a *App) StartUpdateDownload() error {
+	defer a.recoverPanic("StartUpdateDownload")
+	go func() {
+		if _, err := a.updateMgr.Download(context.Background()); err != nil {
+			a.LogSystemError("update", "download failed: "+err.Error())
+		}
+	}()
+	return nil
+}
+
+// InstallUpdate replaces the installation and restarts the application. It
+// fails while any managed process is still running.
+func (a *App) InstallUpdate() (updater.InstallResult, error) {
+	defer a.recoverPanic("InstallUpdate")
+	result, _, err := a.updateMgr.Install(a.ctx)
+	if err != nil {
+		return result, err
+	}
+	if result.RestartRequired {
+		SetQuitting(true)
+		go func() {
+			time.Sleep(500 * time.Millisecond)
+			runtime.Quit(a.ctx)
+		}()
+	}
+	return result, nil
+}
+
+// GetUpdateState returns the last known update state.
+func (a *App) GetUpdateState() updater.State {
+	defer a.recoverPanic("GetUpdateState")
+	return a.updateMgr.State()
+}
+
+// SetUpdateChannel switches between the stable and beta release channels.
+func (a *App) SetUpdateChannel(channel string) updater.State {
+	defer a.recoverPanic("SetUpdateChannel")
+	a.updateMgr.SetChannel(channel)
+	return a.updateMgr.State()
 }
 
 // VersionInfo represents version information from the server

@@ -218,6 +218,26 @@ func (m *Manager) RunningNames() []string {
 	return names
 }
 
+// ActiveNames returns the names of processes whose run loop is alive. Unlike
+// RunningNames it also covers entries in retry cooldown, which would spawn
+// again moments later, so update guards must use this.
+func (m *Manager) ActiveNames() []string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	names := make([]string, 0, len(m.entries))
+	for _, item := range m.entries {
+		if item.loopActive {
+			name := item.definition.Name
+			if name == "" {
+				name = item.definition.ID
+			}
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
 // StopAll stops all processes
 func (m *Manager) StopAll() {
 	m.mu.RLock()
