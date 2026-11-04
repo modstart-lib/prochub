@@ -68,6 +68,11 @@ func TestParseAssetName(t *testing.T) {
 	if parts == nil || parts.os != "darwin" || parts.arch != "arm64" || parts.kind != "zip" {
 		t.Fatalf("parts = %+v", parts)
 	}
+	// A numeric pre-release suffix must not confuse the os/arch split.
+	parts = parseAssetName("ProcHub-0.8.0-beta.1-linux-amd64.AppImage")
+	if parts == nil || parts.os != "linux" || parts.arch != "amd64" || parts.kind != "AppImage" {
+		t.Fatalf("parts = %+v", parts)
+	}
 	if parseAssetName("ProcHub-linux-amd64.tar.gz") != nil {
 		t.Fatal("unsupported archive should be ignored")
 	}

@@ -27,15 +27,28 @@ export type InstallResult = updater.InstallResult
 /** Shared reactive state, updated by the update:state event. */
 export const updateStore = reactive<{ state: UpdateState | null }>({ state: null })
 
-let bindOnce = false
-let downloadToast: (() => void) | null = null
+/** Shared UI state for the download modal and its minimized indicator. */
+export const updateUI = reactive<{ modalVisible: boolean; minimized: boolean }>({
+  modalVisible: false,
+  minimized: false,
+})
 
-function closeDownloadToast() {
-  if (downloadToast) {
-    downloadToast()
-    downloadToast = null
-  }
+export function showUpdateModal(): void {
+  updateUI.modalVisible = true
+  updateUI.minimized = false
 }
+
+export function hideUpdateToBackground(): void {
+  updateUI.modalVisible = false
+  updateUI.minimized = true
+}
+
+export function reopenUpdateModal(): void {
+  updateUI.modalVisible = true
+  updateUI.minimized = false
+}
+
+let bindOnce = false
 
 /** Subscribe once to backend progress events and load the initial state. */
 export function bindUpdateEvents(): void {
@@ -45,10 +58,12 @@ export function bindUpdateEvents(): void {
     updateStore.state = state
     const appStore = useAppStore()
     if (state.state === 'ready') {
-      closeDownloadToast()
+      if (!updateUI.minimized) {
+        updateUI.modalVisible = true
+      }
       message.success(appStore.t('settings.version.updateReady'))
     } else if (state.state === 'failed') {
-      closeDownloadToast()
+      updateUI.modalVisible = true
       message.error(state.error || appStore.t('settings.version.updateFailed'))
     }
   })
@@ -127,13 +142,7 @@ export async function checkVersionAndPrompt(options: VersionCheckOptions = {}): 
       okText: appStore.t('settings.version.downloadUpdate'),
       cancelText: appStore.t('common.no'),
       onOk() {
-        closeDownloadToast()
-        downloadToast = message.loading({
-          content: appStore.t('settings.version.downloading'),
-          duration: 0,
-        }) as unknown as () => void
-        return StartUpdateDownload().catch((err) => {
-          closeDownloadToast()
+        return downloadUpdate().catch((err) => {
           message.error(String(err))
         })
       },
@@ -148,9 +157,10 @@ export async function checkVersionAndPrompt(options: VersionCheckOptions = {}): 
   }
 }
 
-/** Start the background download (progress arrives through updateStore). */
+/** Start the background download and open the progress modal. */
 export async function downloadUpdate(): Promise<void> {
   bindUpdateEvents()
+  showUpdateModal()
   await StartUpdateDownload()
 }
 

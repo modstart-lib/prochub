@@ -146,9 +146,28 @@ jobs:
         shell: bash
         run: |
           # Snapshots must carry a strictly increasing version so clients can
-          # compare them: 0.8.0-beta -> 0.8.0-beta.<run_number>.
+          # compare them. Accept bases like 0.8.0-beta, 0.8.0-beta.1 and
+          # 0.8.0; never produce 0.8.0-beta.1.38 (invalid semver).
           BASE=$(sed -n 's/.*Version:[[:space:]]*"v*\([^"]*\)".*/\1/p' code/app.go | head -1)
-          SNAP="${BASE}.${{ github.run_number }}"
+          SUFFIX=""
+          case "$BASE" in
+            *-*.[0-9]*) SUFFIX=${BASE##*.} ;;
+          esac
+          BASE=$(printf '%s' "$BASE" | sed -E 's/(-[A-Za-z]+)\.[0-9]+$/\1/')
+          RUN=${{ github.run_number }}
+          if [ -n "$SUFFIX" ] && [ "$SUFFIX" -ge "$RUN" ]; then
+            RUN=$((SUFFIX + 1))
+          fi
+          case "$BASE" in
+            *-beta|*-alpha|*-rc|*-dev) SNAP="${BASE}.${RUN}" ;;
+            *)
+              CORE=${BASE%%-*}
+              MAJOR=$(printf '%s' "$CORE" | cut -d. -f1)
+              MINOR=$(printf '%s' "$CORE" | cut -d. -f2)
+              PATCH=$(printf '%s' "$CORE" | cut -d. -f3)
+              SNAP="${MAJOR}.${MINOR}.$((PATCH + 1))-dev.${RUN}"
+              ;;
+          esac
           sed -i.bak -E "s/(Version:[[:space:]]+\")[^\"]*(\")/\1${SNAP}\2/" code/app.go
           rm -f code/app.go.bak
           echo "Snapshot version: ${SNAP}"
@@ -346,15 +365,21 @@ jobs:
             cp "$f" "$tmpdir/$clean"
             echo "Staged: $base -> $clean"
           done
-          # Read the app version from app.go and build the snapshot title
-          VERSION=$(sed -n 's/.*Version:[[:space:]]*"v*\([^"]*\)".*/\1/p' app.go | head -1)
-          # Must match the version injected by the build job (base + run number).
-          SNAP="${VERSION}.${{ github.run_number }}"
-          echo "Detected version: $VERSION (snapshot ${SNAP})"
+          # The build job already injected the increasing version. Read it from
+          # an artifact filename instead of the checked-out app.go so the
+          # release title always matches the binaries even when the open mirror
+          # lags behind prochub-pro.
+          ARTIFACT=$(find _artifacts -type f -name 'ProcHub-*' | head -1)
+          VERSION=$(basename "$ARTIFACT" | sed -E 's/^ProcHub-(.+)-(darwin|windows|linux)-(amd64|arm64)\..*$/\1/')
+          if [ -z "$VERSION" ]; then
+            echo "Cannot detect snapshot version from ${ARTIFACT:-<no artifact>}" >&2
+            exit 1
+          fi
+          echo "Detected version: $VERSION"
           # Create a brand new snapshot release and mark it as latest
           echo "=== Creating fresh vsnapshot release ==="
           gh release create vsnapshot \
-            --title "snapshot-${SNAP}" \
+            --title "snapshot-${VERSION}" \
             --notes "Latest build from main branch" \
             --latest
           echo "=== Uploading to vsnapshot ==="

@@ -6,6 +6,7 @@ import { Cpu, Settings } from 'lucide-vue-next'
 import { computed, getCurrentInstance, onMounted, onUnmounted, ref } from 'vue'
 import AppLogo from './components/AppLogo.vue'
 import AppQuitBlockedModal from './components/AppQuitBlockedModal.vue'
+import UpdateDownloadModal from './components/UpdateDownloadModal.vue'
 import ProcessList from './views/Process.vue'
 import SettingsPage from './views/Setting.vue'
 import { trackVisit } from './services/analytics'
@@ -230,5 +231,8 @@ const themeConfig = computed(() => ({
 
     <!-- 托盘退出被阻止：仍有进程在运行 -->
     <AppQuitBlockedModal v-model:open="quitBlockedVisible" :message="quitBlockedMessage" />
+
+    <!-- 下载进度弹窗 / 后台下载指示 -->
+    <UpdateDownloadModal />
   </ConfigProvider>
 </template>
