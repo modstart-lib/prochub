@@ -142,36 +142,6 @@ jobs:
         shell: pwsh
         run: npm install
 
-      - name: Set Snapshot Version
-        shell: bash
-        run: |
-          # Snapshots must carry a strictly increasing version so clients can
-          # compare them. Accept bases like 0.8.0-beta, 0.8.0-beta.1 and
-          # 0.8.0; never produce 0.8.0-beta.1.38 (invalid semver).
-          BASE=$(sed -n 's/.*Version:[[:space:]]*"v*\([^"]*\)".*/\1/p' code/app.go | head -1)
-          SUFFIX=""
-          case "$BASE" in
-            *-*.[0-9]*) SUFFIX=${BASE##*.} ;;
-          esac
-          BASE=$(printf '%s' "$BASE" | sed -E 's/(-[A-Za-z]+)\.[0-9]+$/\1/')
-          RUN=${{ github.run_number }}
-          if [ -n "$SUFFIX" ] && [ "$SUFFIX" -ge "$RUN" ]; then
-            RUN=$((SUFFIX + 1))
-          fi
-          case "$BASE" in
-            *-beta|*-alpha|*-rc|*-dev) SNAP="${BASE}.${RUN}" ;;
-            *)
-              CORE=${BASE%%-*}
-              MAJOR=$(printf '%s' "$CORE" | cut -d. -f1)
-              MINOR=$(printf '%s' "$CORE" | cut -d. -f2)
-              PATCH=$(printf '%s' "$CORE" | cut -d. -f3)
-              SNAP="${MAJOR}.${MINOR}.$((PATCH + 1))-dev.${RUN}"
-              ;;
-          esac
-          sed -i.bak -E "s/(Version:[[:space:]]+\")[^\"]*(\")/\1${SNAP}\2/" code/app.go
-          rm -f code/app.go.bak
-          echo "Snapshot version: ${SNAP}"
-
       - name: Build Release Files (Linux)
         if: runner.os == 'Linux'
         working-directory: code
@@ -365,10 +335,9 @@ jobs:
             cp "$f" "$tmpdir/$clean"
             echo "Staged: $base -> $clean"
           done
-          # The build job already injected the increasing version. Read it from
-          # an artifact filename instead of the checked-out app.go so the
-          # release title always matches the binaries even when the open mirror
-          # lags behind prochub-pro.
+          # Read the version from an artifact filename. It is exactly the
+          # version written in app.go; snapshot titles stay identical to the
+          # source version instead of appending the workflow run number.
           ARTIFACT=$(find _artifacts -type f -name 'ProcHub-*' | head -1)
           VERSION=$(basename "$ARTIFACT" | sed -E 's/^ProcHub-(.+)-(darwin|windows|linux)-(amd64|arm64)\..*$/\1/')
           if [ -z "$VERSION" ]; then
@@ -380,7 +349,7 @@ jobs:
           echo "=== Creating fresh vsnapshot release ==="
           gh release create vsnapshot \
             --title "snapshot-${VERSION}" \
-            --notes "Latest build from main branch" \
+            --notes "Latest build from main branch (run ${GITHUB_RUN_NUMBER})" \
             --latest
           echo "=== Uploading to vsnapshot ==="
           for f in "$tmpdir"/*; do
