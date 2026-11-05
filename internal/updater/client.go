@@ -16,8 +16,6 @@ import (
 const (
 	// DefaultRepo is used by the GitHub fallback when the backend is unreachable.
 	DefaultRepo = "modstart-lib/prochub"
-
-	defaultProxyPrefixes = "https://ghfast.top/,https://ghproxy.net/,https://gh-proxy.com/"
 )
 
 // Client talks to the update backend and falls back to GitHub Releases.
@@ -27,7 +25,6 @@ type Client struct {
 	Platform  Platform
 	UserAgent string
 	HTTP      *http.Client
-	Mirrors   []string
 
 	// DisableGitHubFallback keeps Check offline when the backend itself fails.
 	// It exists for tests and for callers that want a single source of truth.
@@ -48,7 +45,6 @@ func NewClient(endpoint, repo string, platform Platform, userAgent string) *Clie
 		Platform:  platform,
 		UserAgent: userAgent,
 		HTTP:      &http.Client{Timeout: 30 * time.Second},
-		Mirrors:   defaultMirrors(),
 	}
 }
 
@@ -265,7 +261,7 @@ func (c *Client) checkGitHub(ctx context.Context, channel string) (*Release, err
 			Name:   raw.Name,
 			Size:   raw.Size,
 			SHA256: sum,
-			URLs:   c.buildURLs(raw.BrowserDownloadURL),
+			URLs:   []string{raw.BrowserDownloadURL},
 		})
 	}
 	if len(release.Assets) == 0 {
@@ -346,35 +342,6 @@ func (c *Client) matchesPlatform(osName, arch string) bool {
 	wantOS := map[string]string{"mac": "darwin", "darwin": "darwin", "win": "windows", "windows": "windows", "linux": "linux"}[c.Platform.Name]
 	wantArch := map[string]string{"x64": "amd64", "amd64": "amd64", "arm64": "arm64"}[c.Platform.Arch]
 	return (wantOS == "" || wantOS == osName) && (wantArch == "" || wantArch == arch)
-}
-
-func (c *Client) buildURLs(browserURL string) []string {
-	urls := make([]string, 0, len(c.Mirrors)+1)
-	for _, prefix := range c.Mirrors {
-		if prefix == "" {
-			continue
-		}
-		if strings.Contains(prefix, "{url}") {
-			urls = append(urls, strings.ReplaceAll(prefix, "{url}", browserURL))
-		} else {
-			urls = append(urls, strings.TrimRight(prefix, "/")+"/"+browserURL)
-		}
-	}
-	if browserURL != "" {
-		urls = append(urls, browserURL)
-	}
-	return urls
-}
-
-func defaultMirrors() []string {
-	var out []string
-	for _, prefix := range strings.Split(defaultProxyPrefixes, ",") {
-		prefix = strings.TrimSpace(prefix)
-		if prefix != "" {
-			out = append(out, prefix)
-		}
-	}
-	return out
 }
 
 func summaryOf(body string) string {
