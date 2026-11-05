@@ -195,6 +195,21 @@ jobs:
           # Verify the signature
           codesign --verify --verbose=4 "$APP_PATH"
 
+          # Build the zip used by the in-app updater. The .app inside must carry
+          # the notarization ticket, otherwise Gatekeeper rejects it after the
+          # automatic replacement. Notarize the zip, staple the .app, then
+          # recreate the zip so the ticket is included.
+          ZIP_NAME="ProcHub-${VERSION}-darwin-${{ matrix.goarch }}.zip"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_NAME"
+          xcrun notarytool submit "$ZIP_NAME" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple "$APP_PATH"
+          rm -f "$ZIP_NAME"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_NAME"
+
           # Create DMG
           brew install create-dmg
           create-dmg \
@@ -257,7 +272,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: prochub-mac-${{ matrix.goarch }}
-          path: code/ProcHub-*-darwin-${{ matrix.goarch }}.dmg
+          path: |
+            code/ProcHub-*-darwin-${{ matrix.goarch }}.dmg
+            code/ProcHub-*-darwin-${{ matrix.goarch }}.zip
 
       - name: Upload Artifact (Linux)
         if: runner.os == 'Linux'
@@ -335,6 +352,11 @@ jobs:
             cp "$f" "$tmpdir/$clean"
             echo "Staged: $base -> $clean"
           done
+          # checksums.txt is what the client verifies every download against.
+          # Generate it from the staged files so the names match the release.
+          (cd "$tmpdir" && find . -type f -name 'ProcHub-*' -printf '%P\n' | sort | xargs -r sha256sum > checksums.txt)
+          echo "=== checksums.txt ==="
+          cat "$tmpdir/checksums.txt"
           # Read the version from an artifact filename. It is exactly the
           # version written in app.go; snapshot titles stay identical to the
           # source version instead of appending the workflow run number.
