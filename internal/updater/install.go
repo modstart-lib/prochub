@@ -17,6 +17,10 @@ var (
 	ErrProcessesRunning = errors.New("stop all processes before updating")
 )
 
+// installDependencyCheck is set by the platform installer (Linux) and can be
+// replaced by tests that use fake package files.
+var installDependencyCheck func(string) error
+
 // InstallOptions controls the platform install step.
 type InstallOptions struct {
 	// Target overrides the path that will be replaced. Used by tests and by

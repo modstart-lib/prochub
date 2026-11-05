@@ -123,6 +123,9 @@ func TestInstallRefusesWhileProcessesRun(t *testing.T) {
 	// With no running processes the AppImage must be replaced.
 	manager.opts.RunningProcesses = func() []string { return nil }
 	manager.state.State = StateReady
+	oldCheck := installDependencyCheck
+	installDependencyCheck = nil
+	defer func() { installDependencyCheck = oldCheck }()
 	t.Setenv("APPIMAGE", target)
 	result, state, err := manager.Install(context.Background())
 	if err != nil {

@@ -13,7 +13,6 @@ import (
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/menu"
-	"github.com/wailsapp/wails/v2/pkg/menu/keys"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/linux"
@@ -66,34 +65,22 @@ func UpdateTrayLanguage() {
 	}
 }
 
-// createApplicationMenu creates the application menu with Edit menu
-// Returns nil on Windows to hide the menu bar
+// createApplicationMenu creates the native application menu.
+// Only macOS gets one: it owns the system menu bar and needs the Edit roles for
+// Cmd-based clipboard shortcuts. On Linux Wails renders the menu as a GTK menu
+// bar packed inside the window (a visible "Edit" strip under the title bar), and
+// on Windows it would be an in-window menu bar as well, so both return nil.
+// WebKit handles Ctrl+C/V/X/A/Z inside editable elements by itself.
 func createApplicationMenu() *menu.Menu {
-	// On Windows, return nil to hide menu bar
-	// Keyboard shortcuts (Ctrl+C/V/X/A/Z) work natively via WebviewGpuIsDisabled=false
-	if goruntime.GOOS == "windows" {
+	if goruntime.GOOS != "darwin" {
 		return nil
 	}
 
 	appMenu := menu.NewMenu()
-
-	if goruntime.GOOS == "darwin" {
-		// App menu (macOS only)
-		appMenu.Append(menu.AppMenu())
-		// Edit menu with standard shortcuts using roles (macOS)
-		appMenu.Append(menu.EditMenu())
-	} else {
-		// Edit menu with standard shortcuts (Linux)
-		editMenu := appMenu.AddSubmenu("Edit")
-		editMenu.AddText("Undo", keys.CmdOrCtrl("z"), func(_ *menu.CallbackData) {})
-		editMenu.AddText("Redo", keys.CmdOrCtrl("shift+z"), func(_ *menu.CallbackData) {})
-		editMenu.AddSeparator()
-		editMenu.AddText("Cut", keys.CmdOrCtrl("x"), func(_ *menu.CallbackData) {})
-		editMenu.AddText("Copy", keys.CmdOrCtrl("c"), func(_ *menu.CallbackData) {})
-		editMenu.AddText("Paste", keys.CmdOrCtrl("v"), func(_ *menu.CallbackData) {})
-		editMenu.AddText("Select All", keys.CmdOrCtrl("a"), func(_ *menu.CallbackData) {})
-	}
-
+	// App menu (macOS only)
+	appMenu.Append(menu.AppMenu())
+	// Edit menu with standard shortcuts using roles (macOS)
+	appMenu.Append(menu.EditMenu())
 	return appMenu
 }
 

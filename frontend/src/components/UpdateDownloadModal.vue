@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { Alert, Button, Modal, Progress, Tag, message } from 'ant-design-vue'
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import {
   bindUpdateEvents,
   hideUpdateToBackground,
@@ -13,6 +13,7 @@ import { useAppStore } from '../stores/app'
 
 const appStore = useAppStore()
 const state = computed(() => updateStore.state)
+const installError = ref('')
 
 const visible = computed({
   get: () => updateUI.modalVisible,
@@ -27,6 +28,10 @@ const installing = computed(
   () => state.value?.state === 'installing' || state.value?.state === 'restarting',
 )
 const failed = computed(() => state.value?.state === 'failed' && !!state.value?.error)
+const dependencyError = computed(() =>
+  (state.value?.error || '').includes('missing system dependency'),
+)
+const errorDescription = computed(() => (state.value?.error || '').replace(/^install:\s*/, ''))
 
 const progressStatus = computed<'active' | 'success' | 'normal'>(() => {
   if (downloading.value) return 'active'
@@ -76,13 +81,15 @@ function handleClose() {
 }
 
 async function handleInstall() {
+  installError.value = ''
   try {
     await installUpdate()
   } catch (e) {
     const text = e instanceof Error ? e.message : String(e)
+    installError.value = text
     if (text.includes('stop all processes')) {
       message.error(appStore.t('settings.version.stopProcessesFirst'))
-    } else {
+    } else if (!text.includes('missing system dependency')) {
       message.error(appStore.t('settings.version.installFailed'))
     }
   }
@@ -112,10 +119,17 @@ onMounted(() => {
         <Alert
           type="error"
           show-icon
-          :message="appStore.t('settings.version.updateFailed')"
-          :description="state?.error"
+          :message="
+            dependencyError
+              ? appStore.t('settings.version.missingDependency')
+              : appStore.t('settings.version.updateFailed')
+          "
+          :description="errorDescription"
         />
         <div class="actions">
+          <Button v-if="state?.downloadedPath" @click="handleInstall">
+            {{ appStore.t('settings.version.retryInstall') }}
+          </Button>
           <Button @click="handleClose">{{ appStore.t('settings.version.close') }}</Button>
         </div>
       </template>
@@ -126,6 +140,14 @@ onMounted(() => {
           {{ formatBytes(state?.downloaded || 0) }} / {{ formatBytes(state?.total || 0) }}
         </div>
         <div class="hint">{{ hintText }}</div>
+
+        <Alert
+          v-if="installError"
+          type="error"
+          show-icon
+          :message="appStore.t('settings.version.missingDependency')"
+          :description="installError"
+        />
 
         <div class="actions">
           <Button v-if="downloading" @click="handleBackground">

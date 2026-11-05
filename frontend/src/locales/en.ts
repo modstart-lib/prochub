@@ -205,6 +205,8 @@ export default {
       installing: 'Installing update...',
       updateFailed: 'Update failed',
       installFailed: 'Failed to install the update',
+      missingDependency: 'Missing system dependency; update blocked',
+      retryInstall: 'Retry Install',
       stopProcessesFirst: 'Stop all processes before updating',
       openDownloadPage: 'Open Download Page',
       updateDownloadTitle: 'Update Download',

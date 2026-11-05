@@ -157,6 +157,16 @@ export async function checkVersionAndPrompt(options: VersionCheckOptions = {}): 
   }
 }
 
+/** Run a check without a confirm dialog (used by automation). */
+export async function checkUpdateOnly(
+  channel: 'latest' | 'stable' | 'beta' = 'latest',
+): Promise<UpdateState> {
+  bindUpdateEvents()
+  const state = await CheckUpdate(channel)
+  updateStore.state = state
+  return state
+}
+
 /** Start the background download and open the progress modal. */
 export async function downloadUpdate(): Promise<void> {
   bindUpdateEvents()

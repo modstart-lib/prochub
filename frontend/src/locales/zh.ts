@@ -205,6 +205,8 @@ export default {
       installing: '正在安装更新...',
       updateFailed: '更新失败',
       installFailed: '安装更新失败',
+      missingDependency: '缺少系统依赖，已阻止更新',
+      retryInstall: '重试安装',
       stopProcessesFirst: '请先停止所有进程后再更新',
       openDownloadPage: '打开下载页',
       updateDownloadTitle: '更新下载',

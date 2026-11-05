@@ -5,6 +5,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime';
 import {
   bindUpdateEvents,
+  checkUpdateOnly,
   checkVersionAndPrompt,
   downloadUpdate,
   getAppVersion,
@@ -42,10 +43,22 @@ onMounted(async () => {
   testActionSet('Setting.getVersion', () => appVersion.value)
   testActionSet('Setting.getVersionChecking', () => versionChecking.value)
   testActionSet('Setting.isAppStoreBuild', () => isAppStoreBuild)
+  testActionSet('Setting.checkUpdate', () => checkUpdateOnly('latest'))
+  testActionSet('Setting.downloadUpdate', () => downloadUpdate())
+  testActionSet('Setting.installUpdate', () => installUpdate())
+  testActionSet('Setting.getUpdateState', () => updateStore.state)
 })
 
 onUnmounted(() => {
-  testActionUnset(['Setting.getVersion', 'Setting.getVersionChecking', 'Setting.isAppStoreBuild'])
+  testActionUnset([
+    'Setting.getVersion',
+    'Setting.getVersionChecking',
+    'Setting.isAppStoreBuild',
+    'Setting.checkUpdate',
+    'Setting.downloadUpdate',
+    'Setting.installUpdate',
+    'Setting.getUpdateState',
+  ])
 })
 
 const handleCheckVersion = async () => {
@@ -79,6 +92,8 @@ const handleInstall = async () => {
     const text = e instanceof Error ? e.message : String(e)
     if (text.includes('stop all processes')) {
       message.error(appStore.t('settings.version.stopProcessesFirst'))
+    } else if (text.includes('missing system dependency')) {
+      message.error(text)
     } else {
       message.error(appStore.t('settings.version.installFailed'))
     }

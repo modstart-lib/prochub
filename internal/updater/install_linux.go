@@ -8,6 +8,10 @@ import (
 	"os"
 )
 
+func init() {
+	installDependencyCheck = checkAppImageDependencies
+}
+
 // installPlatform replaces a running AppImage in place. A .deb installed by the
 // system package manager is not touched: it needs root and dpkg/apt state.
 func installPlatform(ctx context.Context, asset Asset, downloaded string, opts InstallOptions) (InstallResult, error) {
@@ -23,6 +27,13 @@ func installPlatform(ctx context.Context, asset Asset, downloaded string, opts I
 	}
 	if err := ensureDir(target); err != nil {
 		return InstallResult{}, err
+	}
+	// Never replace a working AppImage with one whose system libraries are
+	// missing; that would leave the user unable to start the app.
+	if installDependencyCheck != nil {
+		if err := installDependencyCheck(downloaded); err != nil {
+			return InstallResult{}, err
+		}
 	}
 
 	logf(opts, "replacing %s", target)
