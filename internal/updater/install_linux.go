@@ -6,7 +6,17 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"syscall"
+	"time"
 )
+
+// relaunchAfterInstall starts the replaced AppImage once the old process exits.
+// Tests switch it off because they do not run the real application lifecycle.
+var relaunchAfterInstall = true
 
 func init() {
 	installDependencyCheck = checkAppImageDependencies
@@ -55,8 +65,41 @@ func installPlatform(ctx context.Context, asset Asset, downloaded string, opts I
 	if err := os.Chmod(target, 0o755); err != nil {
 		return InstallResult{}, err
 	}
+	if err := scheduleRelaunch(target); err != nil {
+		// The replacement already succeeded; a failed relaunch only means the
+		// user has to start ProcHub manually.
+		logf(opts, "cannot schedule relaunch: %v", err)
+	}
 	return InstallResult{
-		Message:         "AppImage replaced; restart ProcHub to use the new version",
+		Message:         "AppImage replaced; ProcHub is restarting with the new version",
 		RestartRequired: true,
 	}, nil
+}
+
+// scheduleRelaunch starts a detached helper that waits for this process to
+// exit and then opens the replaced AppImage. Starting it earlier would race
+// with the AppImage mount that is still in use.
+func scheduleRelaunch(target string) error {
+	if !relaunchAfterInstall {
+		return nil
+	}
+	script := filepath.Join(os.TempDir(), fmt.Sprintf("prochub-update-%d.sh", os.Getpid()))
+	quoted := "'" + strings.ReplaceAll(target, "'", `'\''`) + "'"
+	content := "#!/bin/sh\n" +
+		"while kill -0 " + strconv.Itoa(os.Getpid()) + " 2>/dev/null; do sleep 0.2; done\n" +
+		"rm -f \"$0\"\n" +
+		"nohup " + quoted + " >/dev/null 2>&1 &\n"
+	if err := os.WriteFile(script, []byte(content), 0o755); err != nil {
+		return err
+	}
+	cmd := exec.Command("/bin/sh", script)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	if err := cmd.Start(); err != nil {
+		os.Remove(script)
+		return err
+	}
+	_ = cmd.Process.Release()
+	// Give the helper a moment to start before the caller quits the app.
+	time.Sleep(50 * time.Millisecond)
+	return nil
 }

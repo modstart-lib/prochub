@@ -34,6 +34,9 @@ type Options struct {
 	UserAgent        string
 	OnEvent          func(Event)
 	RunningProcesses func() []string
+	// DownloadAttempts is the number of passes over all mirrors before a
+	// download fails. Zero uses the updater default.
+	DownloadAttempts int
 }
 
 // Manager owns the check/download/install state machine.
@@ -199,16 +202,20 @@ func (m *Manager) Download(ctx context.Context) (State, error) {
 	urls := OrderBySpeed(ctx, asset.URLs, m.client.UserAgent)
 	ordered := *asset
 	ordered.URLs = urls
-	path, err := Download(ctx, ordered, dir, m.client.UserAgent, func(done, total int64) {
-		m.mu.Lock()
-		m.state.Downloaded = done
-		m.state.Total = total
-		if total > 0 {
-			m.state.Progress = int(done * 100 / total)
-		}
-		state := m.state
-		m.mu.Unlock()
-		m.emitState(state)
+	path, err := DownloadWithOptions(ctx, ordered, dir, DownloadOptions{
+		UserAgent: m.client.UserAgent,
+		Attempts:  m.opts.DownloadAttempts,
+		Progress: func(done, total int64) {
+			m.mu.Lock()
+			m.state.Downloaded = done
+			m.state.Total = total
+			if total > 0 {
+				m.state.Progress = int(done * 100 / total)
+			}
+			state := m.state
+			m.mu.Unlock()
+			m.emitState(state)
+		},
 	})
 	if err != nil {
 		return m.fail(fmt.Errorf("download: %w", err))

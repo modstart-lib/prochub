@@ -25,6 +25,9 @@ type Client struct {
 	Platform  Platform
 	UserAgent string
 	HTTP      *http.Client
+	// GitHubAPI is the release API base, "https://api.github.com/repos" by
+	// default. Tests point it at a local server.
+	GitHubAPI string
 
 	// DisableGitHubFallback keeps Check offline when the backend itself fails.
 	// It exists for tests and for callers that want a single source of truth.
@@ -176,6 +179,7 @@ type githubRelease struct {
 	TagName     string        `json:"tag_name"`
 	Name        string        `json:"name"`
 	Body        string        `json:"body"`
+	HTMLURL     string        `json:"html_url"`
 	Draft       bool          `json:"draft"`
 	Prerelease  bool          `json:"prerelease"`
 	PublishedAt string        `json:"published_at"`
@@ -183,7 +187,11 @@ type githubRelease struct {
 }
 
 func (c *Client) checkGitHub(ctx context.Context, channel string) (*Release, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/releases?per_page=30", c.Repo)
+	api := c.GitHubAPI
+	if api == "" {
+		api = "https://api.github.com/repos"
+	}
+	url := fmt.Sprintf("%s/%s/releases?per_page=30", strings.TrimRight(api, "/"), c.Repo)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -228,6 +236,7 @@ func (c *Client) checkGitHub(ctx context.Context, channel string) (*Release, err
 		Version: best.TagName,
 		Summary: summaryOf(best.Body),
 		Notes:   best.Body,
+		URL:     best.HTMLURL,
 		Channel: channel,
 	}
 	if best.PublishedAt != "" {
@@ -339,9 +348,42 @@ func parseAssetName(name string) *assetNameParts {
 }
 
 func (c *Client) matchesPlatform(osName, arch string) bool {
-	wantOS := map[string]string{"mac": "darwin", "darwin": "darwin", "win": "windows", "windows": "windows", "linux": "linux"}[c.Platform.Name]
-	wantArch := map[string]string{"x64": "amd64", "amd64": "amd64", "arm64": "arm64"}[c.Platform.Arch]
-	return (wantOS == "" || wantOS == osName) && (wantArch == "" || wantArch == arch)
+	return assetMatchesPlatform(c.Platform, osName, arch)
+}
+
+// assetMatchesPlatform compares an asset's os/arch vocabulary (possibly the
+// backend's mac/x64 or the GitHub runtime's darwin/amd64) with a Platform.
+// Empty fields on either side mean "not specified".
+func assetMatchesPlatform(platform Platform, osName, arch string) bool {
+	wantOS := aliasOS(platform.Name)
+	wantArch := aliasArch(platform.Arch)
+	if osName != "" && wantOS != "" && aliasOS(osName) != wantOS {
+		return false
+	}
+	if arch != "" && wantArch != "" && aliasArch(arch) != wantArch {
+		return false
+	}
+	return true
+}
+
+func aliasOS(value string) string {
+	switch value {
+	case "mac":
+		return "darwin"
+	case "win":
+		return "windows"
+	}
+	return value
+}
+
+func aliasArch(value string) string {
+	switch value {
+	case "x64":
+		return "amd64"
+	case "aarch64":
+		return "arm64"
+	}
+	return value
 }
 
 func summaryOf(body string) string {
@@ -371,6 +413,9 @@ func PickAsset(release *Release, platform Platform) *Asset {
 		asset := &release.Assets[i]
 		rank, ok := priority[asset.Kind]
 		if !ok {
+			continue
+		}
+		if !assetMatchesPlatform(platform, asset.OS, asset.Arch) {
 			continue
 		}
 		if best == -1 || rank < priority[release.Assets[best].Kind] {

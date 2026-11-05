@@ -88,3 +88,88 @@ func TestPickAssetPrefersZip(t *testing.T) {
 		t.Fatalf("asset = %+v", asset)
 	}
 }
+
+func TestPickAssetFiltersPlatform(t *testing.T) {
+	release := &Release{Assets: []Asset{
+		{OS: "mac", Arch: "arm64", Kind: "zip", Name: "mac.zip"},
+		{OS: "linux", Arch: "x64", Kind: "AppImage", Name: "linux.AppImage"},
+		{OS: "windows", Arch: "x64", Kind: "exe", Name: "win.exe"},
+	}}
+	if asset := PickAsset(release, Platform{Name: "linux", Arch: "x64"}); asset == nil || asset.Name != "linux.AppImage" {
+		t.Fatalf("linux asset = %+v", asset)
+	}
+	if asset := PickAsset(release, Platform{Name: "win", Arch: "amd64"}); asset == nil || asset.Name != "win.exe" {
+		t.Fatalf("windows asset = %+v", asset)
+	}
+	if asset := PickAsset(release, Platform{Name: "mac", Arch: "arm64"}); asset == nil || asset.Name != "mac.zip" {
+		t.Fatalf("mac asset = %+v", asset)
+	}
+	if asset := PickAsset(release, Platform{Name: "linux", Arch: "arm64"}); asset != nil {
+		t.Fatalf("unexpected asset = %+v", asset)
+	}
+}
+
+// TestClientGitHubFallbackWithChecksums covers the path used when the update
+// backend is unreachable: the newest published GitHub release is selected and
+// its sha256 is read from checksums.txt.
+func TestClientGitHubFallbackWithChecksums(t *testing.T) {
+	const sha = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/modstart-lib/prochub/releases":
+			_ = json.NewEncoder(w).Encode([]map[string]interface{}{
+				{
+					"tag_name":     "v0.9.0",
+					"name":         "ProcHub 0.9.0",
+					"body":         "# Notes\nsearch fixes",
+					"html_url":     originOf(r) + "/release/v0.9.0",
+					"draft":        false,
+					"prerelease":   false,
+					"published_at": "2026-11-01T10:00:00Z",
+					"assets": []map[string]interface{}{
+						{"name": "checksums.txt", "browser_download_url": originOf(r) + "/checksums.txt"},
+						{"name": "ProcHub-0.9.0-linux-amd64.AppImage", "size": 3, "browser_download_url": originOf(r) + "/asset"},
+					},
+				},
+				{
+					"tag_name":   "v0.10.0-beta",
+					"name":       "beta",
+					"draft":      false,
+					"prerelease": true,
+				},
+			})
+		case "/checksums.txt":
+			_, _ = w.Write([]byte(sha + "  ProcHub-0.9.0-linux-amd64.AppImage\n"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL+"/missing", "modstart-lib/prochub", Platform{Name: "linux", Arch: "x64"}, "test")
+	client.GitHubAPI = server.URL + "/repos"
+	release, err := client.Check(context.Background(), "0.8.0", "stable", "")
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if release.Source != "github" || release.Version != "v0.9.0" {
+		t.Fatalf("release = %+v", release)
+	}
+	if release.Summary != "search fixes" || release.URL == "" {
+		t.Fatalf("summary/url = %q / %q", release.Summary, release.URL)
+	}
+	if len(release.Assets) != 1 {
+		t.Fatalf("assets = %+v", release.Assets)
+	}
+	asset := release.Assets[0]
+	if asset.SHA256 != sha || asset.Kind != "AppImage" || asset.Name != "ProcHub-0.9.0-linux-amd64.AppImage" {
+		t.Fatalf("asset = %+v", asset)
+	}
+	if len(asset.URLs) != 1 || asset.URLs[0] != server.URL+"/asset" {
+		t.Fatalf("urls = %v", asset.URLs)
+	}
+}
+
+func originOf(r *http.Request) string {
+	return "http://" + r.Host
+}

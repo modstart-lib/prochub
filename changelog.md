@@ -2,6 +2,8 @@
 
 ## [unreleased]
 
+- 优化：升级包按当前平台过滤资产，避免多平台发布时选错安装包；Linux AppImage 替换后自动拉起新版本；GitHub 回退补齐 Release 页面地址
+- 新增：升级包下载支持断点续传与自动重试——中断后保留 `.part` 分片，下次通过 HTTP Range 从已下载字节继续（多个镜像之间也可接力续传）；默认最多 4 轮重试并指数退避，校验失败会丢弃损坏分片后重新下载
 - 优化：下载镜像地址统一由更新后端返回（后端按客户端 IP 下发多通道），客户端不再内置 GitHub 代理前缀；后端不可用时回退 GitHub Releases 只使用官方直连地址
 - 新增：应用内自动更新——检查更新改为请求后端 `app_manager/updater`，后端从 GitHub Releases 解析当前平台的安装包、`sha256` 与多镜像下载地址；客户端并发测速选择最快镜像，下载后强制校验 `sha256`，再调用平台安装器替换并重启。后端不可用时回落 GitHub Releases API
 - 新增：版本识别默认按 GitHub Release 的发布时间取最新（`latest`），beta 打包完成后即可被识别；同时保留 `stable`（排除 prerelease）与 `beta`（仅 prerelease）通道。客户端仍做版本比较，旧 beta 不会造成降级

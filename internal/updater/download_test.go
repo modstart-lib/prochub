@@ -126,6 +126,9 @@ func TestInstallRefusesWhileProcessesRun(t *testing.T) {
 	oldCheck := installDependencyCheck
 	installDependencyCheck = nil
 	defer func() { installDependencyCheck = oldCheck }()
+	oldRelaunch := relaunchAfterInstall
+	relaunchAfterInstall = false
+	defer func() { relaunchAfterInstall = oldRelaunch }()
 	t.Setenv("APPIMAGE", target)
 	result, state, err := manager.Install(context.Background())
 	if err != nil {
