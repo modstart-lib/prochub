@@ -24,6 +24,46 @@ export interface ProcessItem {
   lastError: string
 }
 
+// How same-name processes are treated when importing a process file.
+export type ProcessImportMode = 'skip' | 'overwrite'
+
+// One entry of a process file as reported by the backend preview. conflict is
+// set to "name" when a process with the same name already exists, and error is
+// set when the entry cannot be imported at all.
+export interface ProcessImportCandidate {
+  definition: {
+    id: string
+    name: string
+    command: string
+    args?: string[]
+    workingDir?: string
+    env?: Record<string, string>
+    autoStart?: boolean
+    restartPolicy?: string
+    maxRetries?: number
+  }
+  conflict: string
+  error: string
+}
+
+export interface ProcessImportPreview {
+  path: string
+  appVersion: string
+  exportedAt?: string
+  total: number
+  importable: number
+  conflicts: number
+  processes: ProcessImportCandidate[]
+}
+
+export interface ProcessImportResult {
+  total: number
+  imported: string[]
+  updated: string[]
+  skipped: string[]
+  invalid: string[]
+}
+
 export const useAppStore = defineStore('app', () => {
   const locale = ref<'zh' | 'en'>('zh')
   const isDark = ref(false)
@@ -203,6 +243,43 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  // Export every process definition to a user-chosen JSON file. Returns the
+  // saved path, or "" when the user cancelled the save dialog.
+  const exportProcesses = async () => {
+    try {
+      return await AppAPI.ExportProcesses()
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      trackError(`Failed to export processes: ${errorMsg}`)
+      console.error('Failed to export processes:', error)
+      throw error
+    }
+  }
+
+  // Open the import file picker and return the chosen path ("" on cancel).
+  const selectProcessImportFile = async () => AppAPI.SelectProcessImportFile()
+
+  // Parse a process file without applying it, so the user can review entries
+  // and same-name conflicts first.
+  const previewProcessImport = async (path: string) => {
+    const preview = await AppAPI.PreviewProcessImport(path)
+    return preview as unknown as ProcessImportPreview
+  }
+
+  // Apply a previously previewed process file and refresh the list.
+  const importProcesses = async (path: string, mode: ProcessImportMode) => {
+    try {
+      const result = (await AppAPI.ImportProcesses(path, mode)) as unknown as ProcessImportResult
+      await loadProcesses()
+      return result
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      trackError(`Failed to import processes: ${errorMsg}`)
+      console.error('Failed to import processes:', error)
+      throw error
+    }
+  }
+
   // Load logs for a specific process
   const loadProcessLogs = async (id: string) => {
     try {
@@ -275,6 +352,10 @@ export const useAppStore = defineStore('app', () => {
     stopProcess,
     restartProcess,
     loadProcessLogs,
+    exportProcesses,
+    selectProcessImportFile,
+    previewProcessImport,
+    importProcesses,
   }
 })
 

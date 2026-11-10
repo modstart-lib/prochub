@@ -40,6 +40,7 @@ Theme, language, auto-start on boot, version update, and about are managed on th
 - **Auto-start**: Configure processes to start automatically when the application launches
 - **Restart Policies**: Support for `always`, `on_failure`, and `never` restart policies
 - **Process Monitoring**: Real-time status monitoring with PID, restart count, and error tracking
+- **Import/Export**: Export process configurations as JSON and import them on another device; review the file first and choose whether same-name processes are skipped or overwritten
 
 ### Cross-Platform Support
 - **Windows** (amd64)

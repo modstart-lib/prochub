@@ -145,6 +145,24 @@ func (m *Manager) Register(def Definition) {
 	}
 }
 
+// UpdateDefinition replaces the stored definition of an existing entry without
+// touching its runtime state. A running process keeps running and uses the new
+// command only after its next start or restart, which makes it safe for bulk
+// operations such as importing configuration over live processes.
+func (m *Manager) UpdateDefinition(id string, def Definition) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	item, ok := m.entries[id]
+	if !ok {
+		return ErrNotFound
+	}
+	// The entry is keyed by ID; never let a caller move it under another key.
+	def.ID = id
+	item.definition = def
+	return nil
+}
+
 // SetAutoStart updates the auto-start flag of a process without disturbing a
 // running process (it does not stop or restart the process).
 func (m *Manager) SetAutoStart(id string, enabled bool) error {

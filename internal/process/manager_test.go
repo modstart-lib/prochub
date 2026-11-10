@@ -33,6 +33,40 @@ func TestSetAutoStart(t *testing.T) {
 	}
 }
 
+func TestUpdateDefinitionKeepsRuntimeState(t *testing.T) {
+	m := NewManager()
+	m.Register(Definition{ID: "proc-1", Name: "test", Command: "old"})
+
+	// Mark the entry as running to prove the update leaves state untouched.
+	m.mu.Lock()
+	m.entries["proc-1"].status = StatusRunning
+	m.entries["proc-1"].pid = 4242
+	m.mu.Unlock()
+
+	next := Definition{ID: "other-id", Name: "test", Command: "new"}
+	if err := m.UpdateDefinition("proc-1", next); err != nil {
+		t.Fatalf("UpdateDefinition failed: %v", err)
+	}
+
+	snap, err := m.Get("proc-1")
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if snap.Definition.Command != "new" {
+		t.Errorf("definition not replaced: %+v", snap.Definition)
+	}
+	if snap.Definition.ID != "proc-1" {
+		t.Errorf("update must keep the entry ID, got %q", snap.Definition.ID)
+	}
+	if snap.Status != StatusRunning || snap.PID != 4242 {
+		t.Errorf("runtime state changed: status=%s pid=%d", snap.Status, snap.PID)
+	}
+
+	if err := m.UpdateDefinition("missing", next); err != ErrNotFound {
+		t.Errorf("expected ErrNotFound for unknown process, got %v", err)
+	}
+}
+
 func TestRunningNames(t *testing.T) {
 	m := NewManager()
 	m.Register(Definition{ID: "proc-1", Name: "alpha", Command: "sleep"})

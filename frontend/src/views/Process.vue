@@ -1,13 +1,14 @@
 <script lang="ts" setup>
 import { Button, InputSearch, Segmented, Switch, message } from 'ant-design-vue'
-import { Cpu, Plus } from 'lucide-vue-next'
+import { Cpu, Download, Plus, Upload } from 'lucide-vue-next'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import type { ProcessItem, ProcessStatus } from '../stores/app'
+import type { ProcessImportCandidate, ProcessImportMode, ProcessImportPreview, ProcessItem, ProcessStatus } from '../stores/app'
 import { useAppStore } from '../stores/app'
 import ProcessAddModal from '@/views/Process/ProcessAddModal.vue'
 import ProcessEditModal from '@/views/Process/ProcessEditModal.vue'
 import ProcessLogsModal from '@/views/Process/ProcessLogsModal.vue'
 import ProcessDetailModal from '@/views/Process/ProcessDetailModal.vue'
+import ProcessImportModal from '@/views/Process/ProcessImportModal.vue'
 import ProcessCard from '@/views/Process/ProcessCard.vue'
 import ProcessDashboardSummary from '@/views/Process/ProcessDashboardSummary.vue'
 import AppEmptyState from '@/components/AppEmptyState.vue'
@@ -22,6 +23,10 @@ const showModal = ref(false)
 const showEditModal = ref(false)
 const showLogsModal = ref(false)
 const showDetailModal = ref(false)
+const showImportModal = ref(false)
+const importPreview = ref<ProcessImportPreview | null>(null)
+const importing = ref(false)
+const exporting = ref(false)
 const editingProcess = ref<ProcessItem | null>(null)
 const logsProcess = ref<ProcessItem | null>(null)
 const detailProcessId = ref('')
@@ -165,6 +170,7 @@ onMounted(() => {
     showDetailModal.value = true
   })
   testActionSet('Process.detailModal.hide', () => { showDetailModal.value = false })
+  testActionSet('Process.importModal.isVisible', () => showImportModal.value)
   testActionSet('Process.start', async (params: unknown) => {
     const { id } = params as { id: string }
     await appStore.startProcess(id)
@@ -191,7 +197,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  testActionUnset(['Process.getStatusFilter', 'Process.setStatusFilter', 'Process.getGroups', 'Process.getGroupByStatus', 'Process.setGroupByStatus', 'Process.detailModal.isVisible', 'Process.detailModal.show', 'Process.detailModal.hide'])
+  testActionUnset(['Process.getStatusFilter', 'Process.setStatusFilter', 'Process.getGroups', 'Process.getGroupByStatus', 'Process.setGroupByStatus', 'Process.detailModal.isVisible', 'Process.detailModal.show', 'Process.detailModal.hide', 'Process.importModal.isVisible'])
 })
 
 const openEditModal = (process: ProcessItem) => {
@@ -249,6 +255,73 @@ const handleDetail = (process: ProcessItem) => {
   detailProcessId.value = process.id
   showDetailModal.value = true
 }
+
+// ── 导入 / 导出 ─────────────────────────────────────────────────────────────
+
+const handleExport = async () => {
+  if (appStore.processes.length === 0) {
+    message.warning(appStore.t('processes.transfer.exportEmpty'))
+    return
+  }
+  exporting.value = true
+  try {
+    const filePath = await appStore.exportProcesses()
+    // An empty path means the user cancelled the save dialog.
+    if (filePath) {
+      message.success(appStore.t('processes.transfer.exported', { count: appStore.processes.length }))
+    }
+  } catch (error) {
+    message.error(appStore.t('processes.transfer.exportFailed'))
+  } finally {
+    exporting.value = false
+  }
+}
+
+const handleImportPick = async () => {
+  try {
+    const path = await appStore.selectProcessImportFile()
+    if (!path) return // cancelled
+    const preview = await appStore.previewProcessImport(path)
+    if (!preview.processes.length) {
+      message.warning(appStore.t('processes.transfer.importEmpty'))
+      return
+    }
+    importPreview.value = preview
+    showImportModal.value = true
+  } catch (error) {
+    message.error(appStore.t('processes.transfer.importInvalid'))
+  }
+}
+
+const handleImportConfirm = async (mode: ProcessImportMode) => {
+  if (!importPreview.value) return
+  importing.value = true
+  try {
+    const result = await appStore.importProcesses(importPreview.value.path, mode)
+    if (result.imported.length + result.updated.length === 0) {
+      message.warning(
+        appStore.t('processes.transfer.importNothing', {
+          skipped: result.skipped.length,
+          invalid: result.invalid.length,
+        })
+      )
+    } else {
+      message.success(
+        appStore.t('processes.transfer.importDone', {
+          imported: result.imported.length,
+          updated: result.updated.length,
+          skipped: result.skipped.length,
+        })
+      )
+    }
+    showImportModal.value = false
+    importPreview.value = null
+  } catch (error) {
+    message.error(appStore.t('processes.transfer.importFailed'))
+  } finally {
+    importing.value = false
+  }
+}
 </script>
 
 <template>
@@ -269,6 +342,19 @@ const handleDetail = (process: ProcessItem) => {
           class="search-input"
           allow-clear
         />
+        <Button
+          :loading="exporting"
+          :disabled="appStore.processes.length === 0"
+          :title="appStore.t('processes.transfer.exportHint')"
+          @click="handleExport"
+        >
+          <template #icon><Download class="w-4 h-4" aria-hidden="true" /></template>
+          {{ appStore.t('processes.transfer.export') }}
+        </Button>
+        <Button :title="appStore.t('processes.transfer.importHint')" @click="handleImportPick">
+          <template #icon><Upload class="w-4 h-4" aria-hidden="true" /></template>
+          {{ appStore.t('processes.transfer.import') }}
+        </Button>
         <Button type="primary" @click="showModal = true">
           <template #icon><Plus class="w-4 h-4" aria-hidden="true" /></template>
           {{ appStore.t('actions.addProcess') }}
@@ -329,6 +415,12 @@ const handleDetail = (process: ProcessItem) => {
       :process-name="logsProcess?.name || ''"
     />
     <ProcessDetailModal v-model:visible="showDetailModal" :process-id="detailProcessId" />
+    <ProcessImportModal
+      v-model:visible="showImportModal"
+      :preview="importPreview"
+      :importing="importing"
+      @confirm="handleImportConfirm"
+    />
   </section>
 </template>
 
@@ -358,7 +450,7 @@ const handleDetail = (process: ProcessItem) => {
 }
 
 .header-actions {
-  @apply flex items-center gap-4;
+  @apply flex flex-wrap items-center justify-end gap-2;
 }
 
 .search-input {

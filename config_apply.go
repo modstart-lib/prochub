@@ -38,6 +38,12 @@ func (a *App) applyConfig(cfg config.AppConfig, origin string) error {
 	a.configMu.Lock()
 	defer a.configMu.Unlock()
 
+	return a.applyConfigLocked(cfg, origin)
+}
+
+// applyConfigLocked is applyConfig for callers that already hold configMu. It
+// keeps the lock ordering identical for every write path.
+func (a *App) applyConfigLocked(cfg config.AppConfig, origin string) error {
 	old := a.config
 
 	if cfg.AutoStart != old.AutoStart {
@@ -143,12 +149,15 @@ func definitionEqual(a, b process.Definition) bool {
 // result. Callers use it instead of reading a.config, mutating a copy and
 // calling applyConfig, which would race with concurrent writers.
 func (a *App) patchConfig(mutate func(cfg *config.AppConfig), origin string) error {
+	// Hold configMu across the whole read-modify-write. Releasing it between
+	// the read and the write would let two concurrent patches start from the
+	// same snapshot and silently drop one of the changes.
 	a.configMu.Lock()
-	cfg := a.config
-	a.configMu.Unlock()
+	defer a.configMu.Unlock()
 
+	cfg := a.config
 	mutate(&cfg)
-	return a.applyConfig(cfg, origin)
+	return a.applyConfigLocked(cfg, origin)
 }
 
 // SetTheme persists the UI theme (light/dark) and broadcasts the change.
